@@ -20,7 +20,6 @@ struct AgentView: View {
     @State private var menuOpen = false
     @State private var drag: CGFloat = 0
     @State private var showSettings = false
-    @State private var showModels = false
 
     var body: some View {
         GeometryReader { geo in
@@ -28,7 +27,7 @@ struct AgentView: View {
             let offset = min(max((menuOpen ? menuWidth : 0) + drag, 0), menuWidth)
             ZStack(alignment: .leading) {
                 ChatList(agent: agent, width: menuWidth, openRun: openRun, select: select,
-                         reuse: { prompt = $0; select(nil) }, openSettings: { showSettings = true })
+                         reuse: { prompt = $0; select(nil) }, needsSetup: needsSetup, openSettings: { showSettings = true })
                     .accessibilityHidden(!menuOpen)
                 chat
                     .background(Color(.systemBackground))
@@ -52,7 +51,6 @@ struct AgentView: View {
             }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showModels) { ModelSelectionView(settings: llm) }
         .task {
             await connection.connect()
             // Test hooks: `devicectl device process launch ... -agentScript "..."` (no LLM, see
@@ -105,26 +103,23 @@ struct AgentView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Chats", systemImage: "line.3.horizontal") { setMenu(true) }
                 }
-                ToolbarItem(placement: .principal) {
-                    Button { showModels = true } label: {
-                        HStack(spacing: 4) {
-                            // "anthropic/claude-sonnet-5.5" -> "claude-sonnet-5.5"
-                            Text(llm.model.isEmpty ? "Choose a model" : llm.model.split(separator: "/").last.map(String.init) ?? llm.model)
-                                .fontWeight(.semibold)
-                                .lineLimit(1)
-                            Image(systemName: "chevron.down").font(.caption.weight(.bold))
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                    .accessibilityLabel("Model: \(llm.model)")
-                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("New Chat", systemImage: "square.and.pencil") { select(nil) }
                         .disabled(openRun == nil && (agent.entries.isEmpty || agent.isRunning))
-                    Button("Settings", systemImage: "gearshape") { showSettings = true }
+                    Button { showSettings = true } label: {
+                        Image(systemName: "gearshape").overlay(alignment: .topTrailing) { if needsSetup { BadgeDot() } }
+                    }
+                    .accessibilityLabel(needsSetup ? "Settings, setup needed" : "Settings")
                 }
             }
         }
+    }
+
+    /// Red dot on the gear: something in the Settings checklist stops the agent from running.
+    private var needsSetup: Bool {
+        if llm.problem != nil { return true }
+        if case .failed = connection.step { return true }
+        return false
     }
 
     private var isConnected: Bool {
@@ -272,6 +267,7 @@ private struct ChatList: View {
     let openRun: RunRecord.ID?
     let select: (RunRecord.ID?) -> Void
     let reuse: (String) -> Void
+    let needsSetup: Bool
     let openSettings: () -> Void
 
     var body: some View {
@@ -325,9 +321,10 @@ private struct ChatList: View {
                         .foregroundStyle(.primary)
                         .frame(width: 50, height: 50)
                         .glass(in: Circle())
+                        .overlay(alignment: .topTrailing) { if needsSetup { BadgeDot().padding(6) } }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Settings")
+                .accessibilityLabel(needsSetup ? "Settings, setup needed" : "Settings")
             }
             .padding(.horizontal, 20)
         }
@@ -357,6 +354,12 @@ private struct ChatRow: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
+    }
+}
+
+private struct BadgeDot: View {
+    var body: some View {
+        Circle().fill(.red).frame(width: 9, height: 9).offset(x: 3, y: -3)
     }
 }
 

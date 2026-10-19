@@ -6,8 +6,11 @@
 import CoreLocation
 import UIKit
 
-final class BackgroundLocationManager: NSObject, CLLocationManagerDelegate {
+final class BackgroundLocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = BackgroundLocationManager()
+
+    /// Shown by the Settings checklist; only "Always" keeps the app alive.
+    @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
 
     private let locationManager = CLLocationManager()
     private var isRunning = false
@@ -21,6 +24,7 @@ final class BackgroundLocationManager: NSObject, CLLocationManagerDelegate {
         locationManager.distanceFilter = CLLocationDistanceMax
         locationManager.allowsBackgroundLocationUpdates = true
         locationManager.pausesLocationUpdatesAutomatically = false
+        authorization = locationManager.authorizationStatus
     }
 
     func configurationDidChange() {
@@ -76,6 +80,7 @@ final class BackgroundLocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        authorization = manager.authorizationStatus
         switch manager.authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
             isRequestingAuthorization = false

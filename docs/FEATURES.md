@@ -13,7 +13,7 @@ doesn't need stays out, to keep the code and the binary small.
 - Live log of each step with timings
 - Connection status line (VPN / tunnel / DDI) *(new)*
 - Run history: past runs in a chat list that slides in from the left *(new)*
-- Model name in the title; tapping it opens the Settings model picker
+- Red dot on the Settings gear when setup blocks a run (model, pairing file, connection)
 - Installed-app list (name: bundle id) in the system prompt
 - Return to the app when the run is done
 - `agent.log` in Documents
@@ -25,6 +25,9 @@ doesn't need stays out, to keep the code and the binary small.
 - "Run Agent" Shortcut / Siri intent
 
 ### Settings
+- Setup checklist on top, each row ✓ / ⚠ / ✗ and opening the screen that fixes it: AI model, pairing file,
+  phone connection (reconnect, redownload DDI), run in background (location "Always" + keep-alive toggles).
+  No catch-all "Advanced": every option sits under a named row.
 - LLM *(new; picker modeled on [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent))*:
   - API key, stored in the Keychain (replaces the bundled `openrouter.txt`)
   - Provider: OpenRouter or a custom OpenAI-compatible base URL
