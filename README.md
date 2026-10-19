@@ -11,13 +11,13 @@
 ![Swift + Rust](https://img.shields.io/badge/Swift%20%2B%20Rust-orange)
 
 <p>
-  <a href="docs/demo.mp4"><img src="docs/images/demo.gif" alt="Demo: the agent opens Notes and writes hello world" width="30%"></a>
+  <a href="docs/demo.mp4"><img src="docs/images/demo.gif" alt="Demo: the agent picks a Lyft ride to the Eiffel Tower" width="30%"></a>
   <img src="docs/images/screen-steps.jpg" alt="The finished run: each step with its screenshot, then the agent's summary" width="30%">
   <img src="docs/images/screen-home.jpg" alt="A new chat with suggested prompts" width="30%">
 </p>
 
-*Left: "Open notes, write "hello world"" (4× speed): the agent leaves its own app, opens Notes, creates a note,
-types the text and taps Done. Middle: the finished run, each step with its screenshot. Right: a new chat.*
+*Left: "Select a Lyft to the Eiffel Tower (don't book yet)" (4× speed): the agent leaves its own app, opens Lyft,
+types the destination, picks it and stops at the ride options. Middle: the finished run, each step with its screenshot. Right: a new chat.*
 
 </div>
 
