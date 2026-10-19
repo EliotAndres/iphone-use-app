@@ -10,23 +10,16 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 ![Swift + Rust](https://img.shields.io/badge/Swift%20%2B%20Rust-orange)
 
-<a href="docs/demo.mp4"><img src="docs/images/demo-poster.jpg" alt="Demo: the agent opens Notes and writes hello world" width="320"></a>
-
-*"Open notes, write "hello world"": the agent leaves its own app, opens Notes, creates a note, types the text and
-taps Done, then reports back in the chat. Tap the image for the video (4× speed, 11 s).*
-
-</div>
-
-## Screens
-
-<p align="center">
-  <img src="docs/images/screen-run.jpg" alt="A run in progress: step screenshots, and the agent asking which order" width="30%">
-  <img src="docs/images/screen-done.jpg" alt="The same run finished, with its last steps and summary" width="30%">
-  <img src="docs/images/screen-setup.jpg" alt="Settings: the setup checklist on first launch" width="30%">
+<p>
+  <a href="docs/demo.mp4"><img src="docs/images/demo.gif" alt="Demo: the agent opens Notes and writes hello world" width="30%"></a>
+  <img src="docs/images/screen-steps.jpg" alt="The finished run: each step with its screenshot, then the agent's summary" width="30%">
+  <img src="docs/images/screen-home.jpg" alt="A new chat with suggested prompts" width="30%">
 </p>
 
-*Left: a run asks a question when it needs one. Middle: the run done, each step with its screenshot. Right: the setup
-checklist on first launch. (Simulator demo run with placeholder screenshots.)*
+*Left: "Open notes, write "hello world"" (4× speed): the agent leaves its own app, opens Notes, creates a note,
+types the text and taps Done. Middle: the finished run, each step with its screenshot. Right: a new chat.*
+
+</div>
 
 ## Features
 
