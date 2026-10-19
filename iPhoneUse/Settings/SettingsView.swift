@@ -361,6 +361,8 @@ private struct SystemPromptEditor: View {
 
 private struct CreditsView: View {
     private let credits: [(name: String, detail: String, url: String)] = [
+        ("StikDebug", "The tunnel, pairing file and developer disk image code is based on StikDebug by Stephen and contributors.",
+         "https://github.com/StephenDev0/StikDebug"),
         ("idevice", "Rust library that talks to the iPhone's developer services.",
          "https://github.com/jkcoxson/idevice"),
         ("LocalDevVPN / StosVPN", "The loopback VPN is based on StosVPN by the SideStore Team, via LocalDevVPN.",

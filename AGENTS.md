@@ -42,6 +42,6 @@ launches the app with `-agentScript`, waits for "script done" in `Documents/agen
 
 - (2026-10-19) idevice is not vendored: `idevice-patch/` + `scripts/build-idevice.sh` rebuild it from jkcoxson/idevice @ 3854a5d.
 - (2026-10-19) Display name is "iphone-use-app". Project/target/module `iPhoneUse`, bundle id `blog.eliot.iphoneuse` (re-import the pairing file after a bundle id change).
-- (2026-10-19) Don't describe this repo as a fork of StikDebug; it is credited in the README only.
+- (2026-10-19) Don't describe this repo as a fork of StikDebug; it is credited in the README and the in-app Credits.
 - (2026-10-19) No tab bar: one ChatGPT-style Agent screen, Settings opens from its top-right gear (see `docs/FEATURES.md`). Each run is one chat in the list; runs don't share context with the model. The loopback VPN ships in the app; no LocalDevVPN, no target IP / port settings (peer is always `10.7.0.1`, port via Bonjour).
 - (2026-10-19) idevice is built with only the features the app calls, and `ring` instead of `aws-lc` (see `scripts/build-idevice.sh`).
