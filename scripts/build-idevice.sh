@@ -18,5 +18,9 @@ cd "$SRC"
 export PATH="$(dirname "$(rustup which cargo)"):$PATH"
 export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$(xcrun --sdk iphoneos --show-sdk-path)"
 export IPHONEOS_DEPLOYMENT_TARGET=17.0
+# idevice's release profile has lto = true, which embeds ~140 MB of LLVM bitcode
+# in the .a (204 MB total). Without LTO/bitcode: 74 MB, same app behaviour.
+# Don't `strip -S` the result: it corrupts aws-lc's assembly objects (link fails).
+export CARGO_PROFILE_RELEASE_LTO=false RUSTFLAGS="-C embed-bitcode=no"
 cargo build --release -p idevice-ffi --target aarch64-apple-ios --features obfuscate
 cp target/aarch64-apple-ios/release/libidevice_ffi.a ffi/idevice.h "$ROOT/StikDebug/idevice/"
