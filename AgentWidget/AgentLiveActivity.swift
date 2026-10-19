@@ -15,7 +15,7 @@ struct AgentLiveActivity: Widget {
         ActivityConfiguration(for: AgentActivityAttributes.self) { context in
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
-                    Label("Agent", systemImage: "sparkles")
+                    Label("iphone-use-app", systemImage: "sparkles")
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -35,7 +35,7 @@ struct AgentLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label("Agent", systemImage: "sparkles")
+                    Label("iphone-use-app", systemImage: "sparkles")
                         .font(.headline)
                 }
                 DynamicIslandExpandedRegion(.trailing) {

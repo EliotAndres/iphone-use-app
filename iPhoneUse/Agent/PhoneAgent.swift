@@ -193,7 +193,7 @@ final class PhoneAgent: ObservableObject {
         activityState.running = false
         let content = ActivityContent(state: activityState, staleDate: nil)
         self.activity = nil
-        Task { await activity.end(content, dismissalPolicy: .after(.now + 600)) }
+        Task { await activity.end(content, dismissalPolicy: .immediate) }
     }
 
     /// Test hook, no LLM: "open com.apple.Preferences; wait 2; tap 0.26 0.2; shot a".
