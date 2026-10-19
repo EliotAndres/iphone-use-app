@@ -178,6 +178,8 @@ struct AgentView: View {
         .onTapGesture { composerFocused = true }
         .glass(in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .sensoryFeedback(.start, trigger: voice.state) { _, new in new == .recording }
+        .sensoryFeedback(.stop, trigger: voice.state) { old, _ in old == .recording }
+        .sensoryFeedback(.error, trigger: voice.error) { _, new in new != nil }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     }

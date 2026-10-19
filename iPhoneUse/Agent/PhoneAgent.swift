@@ -78,6 +78,8 @@ final class PhoneAgent: ObservableObject {
             }
             await say(outcome, as: .assistant, text: outcome.hasPrefix("done: ") ? String(outcome.dropFirst(6)) : outcome)
             record(RunRecord(date: .now, prompt: prompt, model: model, outcome: outcome, log: log, entries: entries))
+            // Pop on success, triple "nope" on failure; the user already knows when they hit Stop.
+            if !Task.isCancelled { AudioServicesPlaySystemSound(outcome.hasPrefix("done: ") ? 1520 : 1521) }
             stopKeepAlive()
             isRunning = false
             endActivity()
