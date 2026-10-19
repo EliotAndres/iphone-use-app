@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: runscript.sh "<script>" shotname...   (runs on 13 Pro, pulls log + shots)
-U=${DEV:-00008110-000A14562209801E}; S=$(cd "$(dirname "$0")" && pwd); B=blog.eliot.stikdebug
+U=${DEV:-00008110-000A14562209801E}; S=$(cd "$(dirname "$0")" && pwd); B=blog.eliot.iphoneuse
 xcrun devicectl device copy to --device $U --domain-type appDataContainer --domain-identifier $B --source /dev/null --destination Documents/agent.log >/dev/null 2>&1
 xcrun devicectl device process launch --device $U --terminate-existing $B -- -agentScript "$1" >/dev/null 2>&1
 for i in $(seq 1 30); do perl -e 'select(undef,undef,undef,3)'

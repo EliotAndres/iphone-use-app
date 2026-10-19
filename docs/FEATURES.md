@@ -65,3 +65,10 @@ doesn't need goes, to keep the code and the binary small.
 ## Not doing
 
 - Connecting over 127.0.0.1 without a VPN: skipped; go straight to the built-in VPN.
+
+## Notes from the implementation
+
+- Run history is in the Agent tab's toolbar (clock icon): prompt, outcome, full log, "Use Prompt".
+- The API key is stored per provider, so switching provider doesn't lose either key.
+- Heartbeat runs only while the agent runs.
+- Bundle id is now `blog.eliot.iphoneuse`: re-import the pairing file after installing.

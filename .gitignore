@@ -97,8 +97,6 @@ iOSInjectionProject/
 .vscode 
 
 ## iphone-use-app
-
-
 # built by scripts/build-idevice.sh
 iPhoneUse/idevice/libidevice_ffi.a
 .build/

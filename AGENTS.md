@@ -1,30 +1,32 @@
 # iphone-use-app
 
 An iPhone app where an LLM controls the phone it runs on: type a prompt (or run
-the "Run Agent" Shortcut) and it loops CoreDevice screenshot -> OpenRouter tool
+the "Run Agent" Shortcut) and it loops CoreDevice screenshot -> chat completion tool
 call -> CoreDevice tap/swipe/type/open-app until done. No Mac or board at run
 time. Background, design notes and gotchas live in Notion: "Controlling iphone".
 
-Fork of [StikDebug](https://github.com/StephenDev0/StikDebug) (remote `upstream`),
-which reaches its own phone's developer services through a loopback VPN
-(LocalDevVPN) + an RP pairing file, using the Rust lib
-[idevice](https://github.com/jkcoxson/idevice).
+Started as a fork of [StikDebug](https://github.com/StephenDev0/StikDebug) (remote `upstream`).
+It reaches its own phone's developer services through a loopback VPN (our `TunnelProvider`
+extension, based on LocalDevVPN/StosVPN) + an RP pairing file, using the Rust lib
+[idevice](https://github.com/jkcoxson/idevice). Feature scope: `docs/FEATURES.md`.
 
 ## Layout
 
-- `StikDebug/Agent/`: agent tab (`AgentView.swift`, `PhoneAgent`), `RunAgentIntent`
-- `AgentWidget/`: Live Activity (widget extension; `AgentActivityAttributes.swift` is shared with the app)
-- `StikDebug/Device/IdeviceFFIBridge.swift`: `agentScreenshot/Touch/Home/Type/Launch`
+- `iPhoneUse/Agent/`: agent tab (`AgentView`), loop + history (`PhoneAgent`), `LLMSettings` (provider, Keychain key, model), `RunAgentIntent`
+- `iPhoneUse/Settings/`: Settings tab, model picker
+- `iPhoneUse/Device/`: `Connection` (VPN -> tunnel -> DDI), `DeviceSession` (tunnel, heartbeat), `DeviceSession+Services.swift` (apps, DDI, `agentScreenshot/Touch/Home/Type/Launch`)
+- `TunnelProvider/`: loopback packet-tunnel extension
+- `AgentWidget/`: Live Activity; `Shared/`: files compiled into both app and widget (`StopAgentIntent` uses `#if WIDGET`)
 - `idevice-patch/`: our additions to idevice's FFI (`probe.rs`: screenshot, touch, buttons, keyboard)
 
 ## Build
 
-1. `scripts/build-idevice.sh` (once, or after changing `idevice-patch/`): builds `StikDebug/idevice/libidevice_ffi.a`, which is gitignored (204 MB).
-2. Put an OpenRouter key in `StikDebug/Agent/openrouter.txt` (gitignored, bundled into the app).
-3. `xcodebuild -project StikDebug.xcodeproj -scheme StikDebug -destination id=<udid> -allowProvisioningUpdates build`, then `xcrun devicectl device install app`.
+1. `scripts/build-idevice.sh` (once, or after changing `idevice-patch/`): builds `iPhoneUse/idevice/libidevice_ffi.a`, which is gitignored (45 MB).
+2. `xcodebuild -project iPhoneUse.xcodeproj -scheme iPhoneUse -destination id=<udid> -allowProvisioningUpdates build`, then `xcrun devicectl device install app`.
 
-On the phone, once: Developer Mode on, LocalDevVPN on, import a pairing file
-(`idevice-tools rppairing pair <name> <out>` over USB), mount the developer disk image.
+On the phone, once: Developer Mode on, import a pairing file
+(`idevice-tools rppairing pair <name> <out>` over USB), allow the VPN configuration prompt,
+add an API key in Settings. The DDI downloads and mounts on its own.
 
 ## Testing without an LLM
 
@@ -35,4 +37,6 @@ launches the app with `-agentScript`, waits for "script done" in `Documents/agen
 ## Decisions
 
 - (2026-10-19) Repo started from the StikDebug fork with its history; `upstream` = StephenDev0/StikDebug. idevice is not vendored: `idevice-patch/` + `scripts/build-idevice.sh` rebuild it from jkcoxson/idevice @ 3854a5d.
-- (2026-10-19) Display name is "iphone-use-app"; bundle id stays `blog.eliot.stikdebug` for now so installed phones keep their pairing file.
+- (2026-10-19) Display name is "iphone-use-app". Project/target/module `iPhoneUse`, bundle id `blog.eliot.iphoneuse` (the pairing file must be re-imported coming from the old `blog.eliot.stikdebug` build).
+- (2026-10-19) App reduced to Agent + Settings tabs (see `docs/FEATURES.md`). The loopback VPN ships in the app; no LocalDevVPN, no target IP / port settings (peer is always `10.7.0.1`, port via Bonjour).
+- (2026-10-19) idevice is built with only the features the app calls, and `ring` instead of `aws-lc` (see `scripts/build-idevice.sh`).

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds libidevice_ffi.a (+ idevice.h) from upstream idevice plus our patch
 # (idevice-patch/: CoreDevice screenshot/touch/keys for the agent) and copies
-# them into StikDebug/idevice/. Needs rustup with the aarch64-apple-ios target.
+# them into iPhoneUse/idevice/. Needs rustup with the aarch64-apple-ios target.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=${IDEVICE_SRC:-$ROOT/.build/idevice}
@@ -22,5 +22,7 @@ export IPHONEOS_DEPLOYMENT_TARGET=17.0
 # in the .a (204 MB total). Without LTO/bitcode: 74 MB, same app behaviour.
 # Don't `strip -S` the result: it corrupts aws-lc's assembly objects (link fails).
 export CARGO_PROFILE_RELEASE_LTO=false RUSTFLAGS="-C embed-bitcode=no"
-cargo build --release -p idevice-ffi --target aarch64-apple-ios --features obfuscate
-cp target/aarch64-apple-ios/release/libidevice_ffi.a ffi/idevice.h "$ROOT/StikDebug/idevice/"
+# Only what the app calls (tunnel, apps list, DDI mount, heartbeat, CoreDevice probe): 45 MB instead of 74 MB.
+FEATURES="ring,obfuscate,core_device,tunnel_tcp_stack,tcp,installation_proxy,mobile_image_mounter,cryptexd,tss,heartbeat"
+cargo build --release -p idevice-ffi --target aarch64-apple-ios --no-default-features --features "$FEATURES"
+cp target/aarch64-apple-ios/release/libidevice_ffi.a ffi/idevice.h "$ROOT/iPhoneUse/idevice/"

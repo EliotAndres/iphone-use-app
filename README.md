@@ -1,150 +1,47 @@
-<div align="center">
-   <img width="217" height="217" src="/assets/StikDebug.png" alt="Logo">
-</div>
+# iphone-use-app
 
-<div align="center">
-  <h1><b>StikDebug</b></h1>
-  <p><i>An on-device debugger/JIT enabler for iOS versions 17.4+ powered by <a href="https://github.com/jkcoxson/idevice">idevice</a>.</i></p>
-</div>
+An iPhone app where an LLM controls the phone it runs on. Type a prompt (or run the
+"Run Agent" Shortcut) and the agent loops: screenshot → model picks a tool call →
+tap / swipe / type / open an app, until it is done. No Mac or extra hardware at run time.
 
-<h3 align="center">
-  <a href="https://discord.gg/ZnNcrRT3M8"><img src="https://img.shields.io/badge/Discord-join%20us-7289DA?logo=discord&logoColor=white&style=for-the-badge&labelColor=23272A" /></a>&nbsp;
-  <a href="https://github.com/StikDebug/StikDebug/blob/main/LICENSE"><img src="https://img.shields.io/github/license/StikDebug/StikDebug?label=License&color=5865F2&style=for-the-badge&labelColor=23272A" /></a>&nbsp;
-  <a href="https://github.com/StikDebug/StikDebug"><img src="https://img.shields.io/github/stars/StikDebug/StikDebug?label=Stars&color=FEE75C&style=for-the-badge&labelColor=23272A" /></a>&nbsp;
-  <a href="https://github.com/StikDebug/StikDebug/releases"><img src="https://img.shields.io/github/v/release/StikDebug/StikDebug?label=Latest&color=00BFFF&style=for-the-badge&labelColor=23272A" /></a>&nbsp;
-   <a href="https://deepwiki.com/StikDebug/StikDebug"><img src="https://img.shields.io/badge/Ask-DeepWiki-grey?style=for-the-badge&labelColor=23272A&color=007ec6" /></a>
-   <br />
-</h3>
+It reaches the phone's own developer services (screenshots, touch, keyboard, app launch)
+over a CoreDevice tunnel, through a loopback VPN that ships inside the app.
 
-## Features
-- **JIT:** Enable Just-In-Time compilation for sideloaded apps that have the `get-task-allow` entitlement.
-- **App Launching:** Launch every app installed on your device.
-- **Console:** Live app and system logs.
-- **Scripts:** Manage automation scripts (mainly used for iOS 26 JIT). 
-- **App Expiry:** See when apps will expire and install/remove profiles.
-- **Device Info:** View detailed device metadata.
-- **Processes:** Inspect running apps/processes and terminate them.
-- **Location Simulator:** Simulate the GPS location of your device.
+## Requirements
 
-## Download
-> [!NOTE]
-> **Notice:** StikDebug is no longer available on the App Store. Please use the official download methods below.
+- iOS 17.4+, Developer Mode on, Wi-Fi on
+- A paid Apple developer team (the built-in VPN needs the Network Extension entitlement)
+- A remote pairing file for the phone, made once over USB:
+  `idevice-tools rppairing pair <name> <out>` ([guide](https://github.com/StikDebug/StikDebug-Guide/blob/main/pairing_file.md))
+- An API key for [OpenRouter](https://openrouter.ai/settings/keys), or any OpenAI-compatible
+  endpoint whose model takes images and tool calls
 
-<h3 align="center">
-<a href="https://altdirect.app/?url=https://stikdebug.xyz/index.json" target="_blank"><img src="https://altdirect.app/assets/png/AltSource_Blue.png" alt="Add AltSource" width="200"></a>
-&nbsp;
-<a href="https://github.com/StikDebug/StikDebug/releases/latest/download/StikDebug-3.1.15.ipa" target="_blank"><img src="https://altdirect.app/assets/png/Download_Blue.png" alt="Download .ipa" width="200"></a>
-</h3>
+## Build
 
-## Compatibility
+1. `scripts/build-idevice.sh` (once, or after changing `idevice-patch/`): builds
+   `iPhoneUse/idevice/libidevice_ffi.a` (gitignored). Needs rustup with the `aarch64-apple-ios` target.
+2. Open `iPhoneUse.xcodeproj`, set your team, run the `iPhoneUse` scheme on the phone.
 
-| iOS Version              | Status               | Notes                                                                 |
-|--------------------------|----------------------|-----------------------------------------------------------------------|
-| 1.0 – 17.3.X             | Not supported        | Uses Different Connection Protocols                                   |
-| 17.4 – 18.x              | Fully supported      | Stable                                                                |
-| 26.0+              | Supported            | Limited App Availability (Developers need to update their apps to work.) |
+## First run
 
-## How to Enable JIT
+1. Settings → Import Pairing File.
+2. Allow the "Add VPN Configuration" prompt. The VPN only routes `10.7.0.1` back to the phone.
+3. Settings → Model: pick a provider, paste the API key, pick a model.
+4. Agent tab: wait for "Connected to this iPhone" (the developer disk image downloads on first run), type a prompt, Run.
 
-StikDebug enables **JIT** for sideloaded apps on iOS 17.4+ without needing a computer after the initial pairing setup.
+Features and what was dropped from StikDebug: [docs/FEATURES.md](docs/FEATURES.md).
 
-### Requirements
-- StikDebug installed (via AltSource, direct .ipa, or self-built)
-- A valid **pairing file** (.plist / .mobiledevicepairing) for your device
-- SideStore / AltStore / similar sideload tool (for app refreshing)
-- A loopback VPN such as [LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044)
+## Credits
 
-### Steps
-1. **Obtain a pairing file**  
-   - Detailed guide: [Pairing File Instructions](https://github.com/StikDebug/StikDebug-Guide/blob/main/pairing_file.md) (or ask in Discord).
-
-2. **Set up VPN**  
-   - Launch LocalDevVPN and enable the VPN.
-
-4. **Enable JIT for an app**  
-   - Launch StikDebug and tap the `Enable JIT` button.
-   - Select your sideloaded app from the list in StikDebug.  
-
-**Troubleshooting**  
-- "Connection dropped" or loopback errors → Check iOS version compatibility / beta warnings.  
-- Heartbeat errors → Ensure that the VPN is on and that you are connected to Wi-Fi. It may be a pairing file issue.
-- Pairing file issues → Replace file with device unlocked & trusted.  
-- Still stuck? Join the [Discord](https://discord.gg/ZnNcrRT3M8) with logs/screenshots.
-
-<!-- 
-## Screenshots
-
-<div align="center">
-  <img src="screenshots/pairing-import.png" width="320" alt="Pairing file import screen">
-  <img src="screenshots/app-list.png" width="320" alt="Sideloaded apps list">
-  <img src="screenshots/jit-enabled.png" width="320" alt="JIT successfully enabled">
-  <img src="screenshots/processes.png" width="320" alt="Process management tab">
-</div>
-
-(Add images to a /screenshots/ folder in the repo and uncomment when ready.)
--->
-
-## Building from Source
-
-> [!IMPORTANT]
-> **Integrating StikDebug or StikJIT into your own project?**  
-> See the [StikJIT Integration Guide](https://github.com/StikDebug/StikJIT/blob/main/INTEGRATION.md) for integration instructions.
-
-### Requirements
-- macOS (latest recommended)
-- Xcode 16+ (Xcode 26+ preferred for iOS 26+ support)
-- iOS device on iOS 17.4+ (for testing)
-- Git
-- Basic Xcode/Swift knowledge
-
-### Steps
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/StikDebug/StikDebug.git
-   cd StikDebug
-   ```
-
-2. **Open in Xcode**
-   - Launch Xcode
-   - Open `StikDebug.xcodeproj`
-
-3. **Configure signing**
-   - Select the **StikDebug** target
-   - Go to **Signing & Capabilities**
-   - Sign in with your Apple ID (free or paid developer account)
-   - Set a unique **Bundle Identifier** (e.g., `com.yourname.StikDebug`)
-
-4. **Build & install**
-   - Select your connected device
-   - Press **Cmd + R** (or Product → Run)
-   - Trust the certificate on device: Settings → General → VPN & Device Management
-
-After install, follow the JIT setup steps above (pairing import, etc.).
-
-## Contributing
-
-Thank you for your interest in contributing to this project. Contributions of all kinds are welcome.
-
-### Reporting Bugs
-If you discover a bug, please open an issue and include:
-- A clear and descriptive title
-- Steps to reproduce the issue
-- Expected behavior vs. actual behavior
-- Relevant logs, screenshots, or environment details (iOS version, device model, etc.)
-
-### Suggesting Features
-To propose a new feature, open a feature request issue and provide:
-- A clear description of the feature
-- The problem it solves or the use case it addresses
-- Any relevant examples or implementation ideas
-
-### Code Contributions (Best Practices)
-- Follow normal Swift and SwiftUI style.
-- Write clear and easy-to-understand code.
-- Keep your changes consistent with how the project is already set up.
-- Make sure everything builds and works without errors.
-
-We appreciate your time and effort in helping improve this project.
+- [StikDebug](https://github.com/StephenDev0/StikDebug) by Stephen and contributors: this app started as a
+  fork of it, and its tunnel, pairing file and developer disk image code lives on here.
+- [idevice](https://github.com/jkcoxson/idevice) by jkcoxson: the Rust library behind every device call.
+- [LocalDevVPN](https://github.com/jkcoxson/LocalDevVPN) / StosVPN by the SideStore Team and Stossy11:
+  the loopback VPN (`TunnelProvider/`) is based on StosVPN.
+- [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent) by Henry Yuan: the model provider
+  and model picker design.
+- [DeveloperDiskImage](https://github.com/doronz88/DeveloperDiskImage) by doronz88: developer disk images.
 
 ## License
-StikDebug is licensed under **AGPL-3.0**. See [`LICENSE`](LICENSE) for details.
+
+AGPL-3.0, inherited from StikDebug. See [`LICENSE`](LICENSE).
