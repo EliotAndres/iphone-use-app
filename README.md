@@ -1,27 +1,69 @@
+<div align="center">
+
+<img src="docs/images/logo.png" alt="iphone-use-app icon" width="160">
+
 # iphone-use-app
 
-An iPhone app where an LLM controls the phone it runs on. Type a prompt (or run the
-"Run Agent" Shortcut) and the agent loops: screenshot → model picks a tool call →
-tap / swipe / type / open an app, until it is done. No Mac or extra hardware at run time.
+**Let an AI model use your iPhone, from the iPhone itself. No Mac, no extra hardware, no jailbreak.**
 
-It reaches the phone's own developer services (screenshots, touch, keyboard, app launch)
-over a CoreDevice tunnel, through a loopback VPN that ships inside the app.
+![iOS](https://img.shields.io/badge/iOS-26%2B-black)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+![Swift + Rust](https://img.shields.io/badge/Swift%20%2B%20Rust-orange)
+
+<a href="docs/demo.mp4"><img src="docs/images/demo-poster.jpg" alt="Demo: the agent opens Notes and writes hello world" width="320"></a>
+
+*"Open notes, write "hello world"": the agent leaves its own app, opens Notes, creates a note, types the text and
+taps Done, then reports back in the chat. Tap the image for the video (42 s).*
+
+</div>
+
+## Features
+
+- **No computer needed:** the agent runs on the iPhone and controls that same iPhone.
+- **No extra hardware, no jailbreak:** it uses the phone's own developer services, the same ones Xcode uses.
+- **Works across apps:** taps, swipes, types, presses Home and opens any installed app.
+- **Runs in the background:** the Live Activity and Dynamic Island show the current step, with a Stop button.
+- **Start it from anywhere:** the chat, Siri, the "Run Agent" Shortcut or an `iphoneuse://run?prompt=…` link.
+- **Bring your own model:** OpenRouter or any compatible endpoint; the key stays in the Keychain.
+- **Run history:** every run is a chat you can reopen, with each step's screenshot.
+- **Free or paid Apple account:** the built-in VPN with a paid team, or the free LocalDevVPN app with a free Apple ID.
+
+## How it works
+
+```mermaid
+flowchart LR
+  P["Prompt, Siri or Shortcut"] --> A["Agent loop<br/>(iphone-use-app)"]
+  A -- "image + history" --> M["Vision model"]
+  M -- "tool call: tap, swipe,<br/>type, open_app, done" --> A
+  A <-- "screenshot / input" --> V["Loopback VPN<br/>10.7.0.1"]
+  V <-- "pairing file = trusted host" --> C["CoreDevice services<br/>of the same iPhone"]
+```
+
+- **Eyes: CoreDevice screenshots.** The app asks the phone's developer services for a screenshot.
+- **Hands: CoreDevice input.** Taps, swipes, typing, Home and app launches go through the same channel.
+  No AssistiveTouch, no pointer calibration.
+- **The link: a loopback VPN + pairing file.** A packet-tunnel extension inside the app (or LocalDevVPN) routes
+  `10.7.0.1` back to the phone; the pairing file lets the app act as a trusted host for its own phone.
+- **Brain: the agent loop.** Screenshot → model picks a tool call → act, until `done`. Up to 40 steps by default.
+- **In the background.** The Live Activity shows the current step and has a Stop button.
+- **History.** Every run is a chat in the drawer, with its steps and screenshots.
 
 ## Requirements
 
-- iOS 17.4+, Developer Mode on, Wi-Fi on
-- A paid Apple developer team for the built-in VPN (it needs the Network Extension entitlement).
-  With a free Apple ID: build with `BUILTIN_VPN=NO` (Xcode build setting or `xcodebuild` argument),
-  install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044) and re-sign the app every 7 days
-- A remote pairing file for the phone (see below)
-- An API key for [OpenRouter](https://openrouter.ai/settings/keys), or any OpenAI-compatible
-  endpoint whose model takes images and tool calls
+| Part | Notes |
+|---|---|
+| **iPhone** | iOS 26 or later, Developer Mode on, Wi-Fi on (the loopback VPN doesn't work cellular-only on recent iOS). |
+| **Apple account** | **Paid team:** the app uses its own built-in VPN (needs the Network Extension entitlement).<br>**Free Apple ID:** build with `BUILTIN_VPN=NO` (Xcode build setting or `xcodebuild` argument) and install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044); re-sign every 7 days. |
+| **Pairing file** | Made once from a Mac over USB (below). |
+| **Vision model** | An [OpenRouter](https://openrouter.ai/settings/keys) key, or any OpenAI-compatible endpoint whose model takes images and tool calls. |
+| **Mac with Xcode + rustup** | Only to build the app and make the pairing file. Not needed at run time. |
 
-## Pairing file
+## Quick start
 
-The phone only opens its developer services (screenshots, touch, keyboard) to a trusted
-host. The pairing file holds the keys of such a host, so the app can act as one for its own
-phone. Make it once from a Mac with the phone plugged in over USB and unlocked (tap Trust if asked):
+### 1. Make a pairing file
+
+The phone only opens its developer services to a trusted host. The pairing file holds the keys of such a host,
+so the app can act as one for its own phone. Plug the phone into the Mac, unlock it (tap Trust if asked), then:
 
 ```sh
 git clone https://github.com/jkcoxson/idevice && cd idevice
@@ -29,20 +71,50 @@ cargo build --release -p idevice-tools --bin idevice-tools
 ./target/release/idevice-tools rppairing pair my-mac pairingFile.plist
 ```
 
-Then import it in the app (below), or, once the app is installed, copy it into its Documents folder:
-
-```sh
-xcrun devicectl device copy to --device <udid> --domain-type appDataContainer \
-  --domain-identifier blog.eliot.iphoneuse --source pairingFile.plist --destination Documents/pairingFile.plist
-```
-
 Make a new one if the app says the pairing file is invalid or expired.
 
-## Build
+### 2. Build and install the app
 
-1. `scripts/build-idevice.sh` (once, or after changing `idevice-patch/`): builds
-   `iPhoneUse/idevice/libidevice_ffi.a` (gitignored). Needs rustup with the `aarch64-apple-ios` target.
-2. Open `iPhoneUse.xcodeproj`, set your team, run the `iPhoneUse` scheme on the phone.
+```sh
+scripts/build-idevice.sh        # once: builds iPhoneUse/idevice/libidevice_ffi.a (needs the aarch64-apple-ios target)
+open iPhoneUse.xcodeproj        # set your team, run the iPhoneUse scheme on the phone
+```
+
+### 3. Set up (once, in the app)
+
+1. Settings (gear, top right) → **Import Pairing File**.<sup>1</sup>
+2. Allow the **Add VPN Configuration** prompt. It only routes `10.7.0.1` back to the phone.
+   With LocalDevVPN instead: turn it on, and pick LocalDevVPN in Settings → Phone Connection
+   (picked for you if the built-in VPN fails).
+3. Settings → **Model**: pick a provider, paste the key, pick a model.
+4. Wait for the "not connected" line above the input to go away (the developer disk image downloads on first run).
+
+<sup>1</sup> Or copy it over once the app is installed:
+`xcrun devicectl device copy to --device <udid> --domain-type appDataContainer --domain-identifier blog.eliot.iphoneuse --source pairingFile.plist --destination Documents/pairingFile.plist`
+
+### 4. Give it a task
+
+Type a goal, for example *"Open Settings and turn on Dark Mode"*, and send it. Stop it from the Dynamic Island
+or the chat.
+
+## Model and prompt
+
+- OpenRouter (model picked from its list) or a custom OpenAI-compatible base URL (vLLM, llama.cpp, Ollama, cloud
+  APIs). The model needs image input and tool calls.
+- The key is stored in the Keychain, one per provider.
+- The system prompt and max steps are editable in Settings. The installed-app list is added to the prompt so the
+  model can open apps by bundle id.
+
+## Development
+
+### Scripted runs (no LLM)
+
+```sh
+DEV=<udid> scripts/runscript.sh "open com.apple.Preferences; wait 1.5; tap 0.5 0.9; shot a" a
+```
+
+Launches the app with `-agentScript`, waits for "script done" in `Documents/agent.log` and pulls the screenshots.
+`-agentPrompt "..."` as a launch argument starts a real run.
 
 ### Simulator (layout checks only)
 
@@ -55,18 +127,31 @@ The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a
    `xcodebuild -project iPhoneUse.xcodeproj -scheme iPhoneUse -configuration Debug -destination id=<sim udid> LIBRARY_SEARCH_PATHS='$(PROJECT_DIR)/iPhoneUse/idevice/sim' build`
 3. Install the `.app` from DerivedData and launch it with `-demoChat YES`.
 
-## First run
-
-1. Settings (gear, top right) → Import Pairing File (skip if you copied it over).
-2. Allow the "Add VPN Configuration" prompt. The VPN only routes `10.7.0.1` back to the phone.
-   With LocalDevVPN instead: turn it on, and pick LocalDevVPN in Settings → Phone connection (picked for you if the built-in VPN fails).
-3. Settings → Model: pick a provider, paste the API key, pick a model.
-4. Back in the chat: wait until the "not connected" line above the input disappears (the developer disk image downloads on first run), then type a prompt and send it.
-
 Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
+## Roadmap
+
+- [x] Drop the separate VPN app: the loopback VPN ships in the app (LocalDevVPN still works for free Apple IDs)
+- [ ] Long runs: reconnect the heartbeat with backoff
+- [ ] Reboot test and 30-minute soak
+
+## Limitations
+
+- Needs Wi-Fi: the loopback VPN doesn't connect cellular-only on iOS 26.6+.
+- Requires a loopback VPN (the built-in one, or [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044)),
+  so you can't use another VPN while the agent runs: iOS allows one at a time, and Tailscale and similar stop
+  while it is on.
+- Pairing files expire; make a new one when the app says so.
+- Sideloaded build only (Developer Mode, developer services): not App Store material.
+- Each step takes a few seconds, most of it the model.
+
+## Known issues
+
+- **"Device Hub: This device was viewed remotely from Mac" shows on every run.** iOS shows it when its
+  developer services are used, even though the "Mac" here is the app itself. Nothing leaves the phone.
+
 <details>
-<summary><h2>Known technical issues</h2></summary>
+<summary><b>Technical details</b></summary>
 
 ### Heartbeat connection closes right after connecting (fixed: runs used to get killed)
 
@@ -97,6 +182,19 @@ with `atos` against the dSYM of the exact build (the UUID in the report must mat
 `dwarfdump --uuid`).
 </details>
 
+## Responsible use
+
+Only automate devices and accounts you own or may use, and respect the terms of the apps involved. The agent acts
+with your hands: watch it, and keep Stop within reach.
+
+## Related projects
+
+| Project | Approach | Difference |
+|---|---|---|
+| [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent) | ESP32-S3 as AirPlay receiver + USB HID mouse, agent app on the phone | Needs a $7 board and AssistiveTouch; no Developer Mode |
+| [ja1chen/actell](https://github.com/ja1chen/actell) | Agent app on the iPhone via CoreDevice | Closest to this one |
+| [mobile-mcp](https://github.com/mobile-next/mobile-mcp), [Midscene](https://github.com/web-infra-dev/midscene) | WebDriverAgent / XCUITest | Need a Mac at run time |
+
 ## Credits
 
 - [StikDebug](https://github.com/StephenDev0/StikDebug) by Stephen and contributors: the tunnel, pairing file
@@ -105,7 +203,7 @@ with `atos` against the dSYM of the exact build (the UUID in the report must mat
 - [LocalDevVPN](https://github.com/jkcoxson/LocalDevVPN) / StosVPN by the SideStore Team and Stossy11:
   the loopback VPN (`TunnelProvider/`) is based on StosVPN.
 - [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent) by Henry Yuan: the model provider
-  and model picker design.
+  and model picker design, and the layout of this README.
 - [DeveloperDiskImage](https://github.com/doronz88/DeveloperDiskImage) by doronz88: developer disk images.
 
 ## License
