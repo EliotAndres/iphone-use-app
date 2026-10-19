@@ -7,55 +7,11 @@
   },
   "groups" : [
     {
-      "blur-material-specializations" : [
-        {
-          "value" : 0.5
-        },
-        {
-          "appearance" : "tinted",
-          "value" : 0.25
-        }
-      ],
       "layers" : [
         {
-          "image-name" : "1Bolt 2.svg",
-          "name" : "1Bolt 2"
-        },
-        {
-          "hidden" : true,
-          "image-name" : "1Bolt.svg",
-          "name" : "1Bolt"
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency-specializations" : [
-        {
-          "value" : {
-            "enabled" : true,
-            "value" : 0.5
-          }
-        },
-        {
-          "appearance" : "tinted",
-          "value" : {
-            "enabled" : true,
-            "value" : 0.7
-          }
-        }
-      ]
-    },
-    {
-      "layers" : [
-        {
-          "fill" : {
-            "solid" : "extended-gray:1.00000,0.30000"
-          },
           "glass" : false,
-          "image-name" : "2Grid.svg",
-          "name" : "2Grid"
+          "image-name" : "Mouse.png",
+          "name" : "Mouse"
         }
       ],
       "shadow" : {
@@ -70,9 +26,6 @@
     }
   ],
   "supported-platforms" : {
-    "circles" : [
-      "watchOS"
-    ],
     "squares" : "shared"
   }
 }
