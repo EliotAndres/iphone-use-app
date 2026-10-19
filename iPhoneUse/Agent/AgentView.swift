@@ -443,20 +443,25 @@ private struct StepCarousel: View {
     let steps: [ChatEntry]
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                // ponytail: non-lazy so cards keep their fade state; fine for maxSteps-sized runs.
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(steps) { StepCard(entry: $0).id($0.id) }
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Steps").font(.headline)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    // ponytail: non-lazy so cards keep their fade state; fine for maxSteps-sized runs.
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(steps) { StepCard(entry: $0).id($0.id) }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
                 }
-                .padding(.horizontal, 16)
-            }
-            .padding(.horizontal, -16) // bleed to the screen edges
-            .onAppear { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
-            .onChange(of: steps.count) {
-                withAnimation(.easeOut(duration: 0.4)) { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
+                .padding(.horizontal, -16) // bleed to the screen edges
+                .onAppear { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
+                .onChange(of: steps.count) {
+                    withAnimation(.easeOut(duration: 0.4)) { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
+                }
             }
         }
+        .padding(.vertical, 12)
     }
 }
 
