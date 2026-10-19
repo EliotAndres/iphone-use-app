@@ -95,14 +95,9 @@ flowchart LR
   O <-- "screenshot / tap, swipe, type" --> V
 ```
 
-- **Eyes: CoreDevice screenshots.** The app asks the phone's developer services for a screenshot.
-- **Hands: CoreDevice input.** Taps, swipes, typing, Home and app launches go through the same channel.
-  No AssistiveTouch, no pointer calibration.
-- **The link: a loopback VPN + pairing file.** A packet-tunnel extension inside the app (or LocalDevVPN) routes
-  `10.7.0.1` back to the phone; the pairing file lets the app act as a trusted host for its own phone.
-- **Brain: the agent loop.** Screenshot → model picks a tool call → act, until `done`. Up to 40 steps by default.
-- **In the background.** The Live Activity shows the current step and has a Stop button.
-- **History.** Every run is a chat in the drawer, with its steps and screenshots.
+The app mounts a developer image, then uses a loopback VPN to screenshot and control the iPhone it runs on.
+Each step, the screenshot goes to the model, which answers with a tool call (tap, swipe, type, open app) until it's done.
+A Live Activity shows progress with a Stop button, and every run is saved as a chat.
 
 ## Quick start
 
