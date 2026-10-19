@@ -13,7 +13,7 @@
 <a href="docs/demo.mp4"><img src="docs/images/demo-poster.jpg" alt="Demo: the agent opens Notes and writes hello world" width="320"></a>
 
 *"Open notes, write "hello world"": the agent leaves its own app, opens Notes, creates a note, types the text and
-taps Done, then reports back in the chat. Tap the image for the video (42 s).*
+taps Done, then reports back in the chat. Tap the image for the video (4× speed, 11 s).*
 
 </div>
 
