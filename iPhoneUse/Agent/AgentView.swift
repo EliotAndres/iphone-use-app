@@ -29,9 +29,11 @@ struct AgentView: View {
                 ChatList(agent: agent, width: menuWidth, openRun: openRun, select: select,
                          reuse: { prompt = $0; select(nil) }, needsSetup: needsSetup, openSettings: { showSettings = true })
                     .accessibilityHidden(!menuOpen)
+                // The mask reaches the screen edges, so the rounded corners follow the
+                // display's instead of clipping the toolbar buttons.
                 chat
                     .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: offset > 0 ? 44 : 0, style: .continuous))
+                    .mask { RoundedRectangle(cornerRadius: offset > 0 ? 44 : 0, style: .continuous).ignoresSafeArea() }
                     .shadow(color: .black.opacity(offset > 0 ? 0.15 : 0), radius: 12)
                     .overlay {
                         if menuOpen { Color.black.opacity(0.001).onTapGesture { setMenu(false) } }
