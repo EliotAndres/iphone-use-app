@@ -18,14 +18,13 @@ struct AgentView: View {
     @FocusState private var composerFocused: Bool
     @State private var openRun: RunRecord.ID? // nil = the live chat
     @State private var menuOpen = false
-    @State private var drag: CGFloat = 0
     @State private var showSettings = false
     @State private var showShortcutsGuide = false
 
     var body: some View {
         GeometryReader { geo in
             let menuWidth = min(geo.size.width * 0.8, 340)
-            let offset = min(max((menuOpen ? menuWidth : 0) + drag, 0), menuWidth)
+            let offset = menuOpen ? menuWidth : 0
             ZStack(alignment: .leading) {
                 ChatList(agent: agent, width: menuWidth, openRun: openRun, select: select,
                          reuse: { prompt = $0; select(nil) }, needsSetup: needsSetup, openSettings: { showSettings = true },
@@ -41,17 +40,6 @@ struct AgentView: View {
                         if menuOpen { Color.black.opacity(0.001).onTapGesture { setMenu(false) } }
                     }
                     .offset(x: offset)
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 20)
-                            .onChanged { g in
-                                if abs(g.translation.width) > abs(g.translation.height) { drag = g.translation.width }
-                            }
-                            .onEnded { _ in
-                                let open = drag > 80 || (menuOpen && drag > -80)
-                                withAnimation(.snappy) { menuOpen = open; drag = 0 }
-                                if open { composerFocused = false }
-                            }
-                    )
             }
             // Distinct from the chat's systemBackground so the panels separate in dark mode,
             // where the shadow is invisible.
