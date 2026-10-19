@@ -105,7 +105,8 @@ final class DeviceSession {
         if size > 10_000_000 { try? FileManager.default.removeItem(at: Self.ideviceLogURL) }
         var path = Array(Self.ideviceLogURL.path.utf8CString)
         path.withUnsafeMutableBufferPointer { buffer in
-            _ = idevice_init_logger(Info, Debug, buffer.baseAddress)
+            // Not Debug: it dumps every XPC message, screenshots included, as decimal byte lists.
+            _ = idevice_init_logger(Info, Info, buffer.baseAddress)
         }
     }
 
@@ -312,16 +313,17 @@ private final class Heartbeat {
             if shouldStop() { break }
 
             if let ffiError {
+                // idevice's HeartbeatError is code 100; sub_code 1 = SleepyTime, 2 = Timeout.
+                let (code, subCode) = (ffiError.pointee.code, ffiError.pointee.sub_code)
                 let description = session.error(from: ffiError, fallback: "Heartbeat failed").localizedDescription
-                if description.contains("HeartbeatSleepyTime") {
-                    appLog.info("Heartbeat stopped: device entered SleepyTime")
-                    break
+                if code == 100, subCode == 2 {
+                    interval = Self.defaultInterval
+                    continue
                 }
-                if !description.contains("HeartbeatTimeout") {
-                    appLog.error("Heartbeat warning: \(description, privacy: .public)")
-                }
-                interval = Self.defaultInterval
-                continue
+                // Anything else ends the loop: a closed connection fails in microseconds, and
+                // retrying it busy-loops until iOS kills the app for background CPU use.
+                appLog.error("Heartbeat stopped: \(description, privacy: .public)")
+                break
             }
 
             interval = min(max(suggestedInterval, 1), Self.maxInterval)
