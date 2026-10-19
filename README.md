@@ -52,38 +52,6 @@ types the text and taps Done. Middle: the finished run, each step with its scree
 - **Sideloaded build only:** it needs Developer Mode and developer services, so it can't go on the App Store.
 - **A few seconds per step:** most of it is the model.
 
-<details>
-<summary><b>Technical details</b></summary>
-
-### Heartbeat connection closes right after connecting (fixed: runs used to get killed)
-
-**Symptom (before the fix):** a run froze on a step after about a minute in the background, and the
-Live Activity stayed on that step. The app had been killed: the phone's crash logs held an
-`iPhoneUse.cpu_resource_fatal-*.ips` report ("exceeding limit of 80% cpu over 60 seconds", "Process killed").
-
-**Cause:** the heartbeat thread (`Heartbeat.run()` in `DeviceSession.swift`) keeps CoreDevice services
-alive during a run. Its connection is closed right after the handshake; idevice's userspace TCP stack
-(jktcp) then answers every read with `BrokenPipe` in microseconds, and the loop retried with no delay,
-about 45k times a second. iOS kills background apps above 80% CPU over 60 seconds.
-
-Two things made it worse:
-- The idevice log was written to `Documents/idevice_log.txt` at Debug level, which prints every XPC
-  message, screenshots included, as decimal byte lists: 178 MB of log and ~1 GB of memory in a minute.
-- The loop matched errors by the strings `HeartbeatTimeout` / `HeartbeatSleepyTime`, which never
-  appear in idevice's messages ("heartbeat timeout", "device went to sleep").
-
-**Fix:** timeouts are matched on the error code (100, sub-code 2) and the loop waits again; any other
-error ends the loop. The file log is at Info.
-
-**Still open:** why the heartbeat connection closes. Runs work without it (a 17-step, 2.5-minute run
-finished fine); if CoreDevice services start dropping on long runs, reconnecting the heartbeat
-(with backoff) is the next step.
-
-**Debugging a killed run:** `idevicecrashreport -u <udid> -k <dir>` pulls the crash logs. Symbolicate
-with `atos` against the dSYM of the exact build (the UUID in the report must match
-`dwarfdump --uuid`).
-</details>
-
 ## How it works
 
 ```mermaid
@@ -163,6 +131,34 @@ The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a
 2. Build Debug (the scheme defaults to Release, which drops `-demoChat`) against that lib:
    `xcodebuild -project iPhoneUse.xcodeproj -scheme iPhoneUse -configuration Debug -destination id=<sim udid> LIBRARY_SEARCH_PATHS='$(PROJECT_DIR)/iPhoneUse/idevice/sim' build`
 3. Install the `.app` from DerivedData and launch it with `-demoChat YES`.
+
+#### Heartbeat connection closes right after connecting (fixed: runs used to get killed)
+
+**Symptom (before the fix):** a run froze on a step after about a minute in the background, and the
+Live Activity stayed on that step. The app had been killed: the phone's crash logs held an
+`iPhoneUse.cpu_resource_fatal-*.ips` report ("exceeding limit of 80% cpu over 60 seconds", "Process killed").
+
+**Cause:** the heartbeat thread (`Heartbeat.run()` in `DeviceSession.swift`) keeps CoreDevice services
+alive during a run. Its connection is closed right after the handshake; idevice's userspace TCP stack
+(jktcp) then answers every read with `BrokenPipe` in microseconds, and the loop retried with no delay,
+about 45k times a second. iOS kills background apps above 80% CPU over 60 seconds.
+
+Two things made it worse:
+- The idevice log was written to `Documents/idevice_log.txt` at Debug level, which prints every XPC
+  message, screenshots included, as decimal byte lists: 178 MB of log and ~1 GB of memory in a minute.
+- The loop matched errors by the strings `HeartbeatTimeout` / `HeartbeatSleepyTime`, which never
+  appear in idevice's messages ("heartbeat timeout", "device went to sleep").
+
+**Fix:** timeouts are matched on the error code (100, sub-code 2) and the loop waits again; any other
+error ends the loop. The file log is at Info.
+
+**Still open:** why the heartbeat connection closes. Runs work without it (a 17-step, 2.5-minute run
+finished fine); if CoreDevice services start dropping on long runs, reconnecting the heartbeat
+(with backoff) is the next step.
+
+**Debugging a killed run:** `idevicecrashreport -u <udid> -k <dir>` pulls the crash logs. Symbolicate
+with `atos` against the dSYM of the exact build (the UUID in the report must match
+`dwarfdump --uuid`).
 
 Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
