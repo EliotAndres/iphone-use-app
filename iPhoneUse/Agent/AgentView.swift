@@ -308,7 +308,7 @@ private struct ChatList: View {
                 .padding(.horizontal, 8)
             }
             .overlay {
-                if agent.history.isEmpty { Text("No chats yet").foregroundStyle(.secondary) }
+                if agent.history.isEmpty { Text("No sessions yet").foregroundStyle(.secondary) }
             }
             HStack {
                 Button { select(nil) } label: {
