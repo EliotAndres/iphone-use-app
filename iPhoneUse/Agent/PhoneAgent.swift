@@ -7,6 +7,7 @@
 //
 
 import ActivityKit
+import AudioToolbox
 import Foundation
 import UIKit
 
@@ -297,6 +298,9 @@ final class PhoneAgent: ObservableObject {
         default:
             throw NSError(domain: "agent", code: 1, userInfo: [NSLocalizedDescriptionKey: "unknown tool \(name)"])
         }
+        // ponytail: 1519 is the undocumented "peek" tap; UIFeedbackGenerator is silent while
+        // another app is in front, which is where the agent acts.
+        AudioServicesPlaySystemSound(1519)
     }
 
     nonisolated private static func num(_ value: Any?) -> CGFloat {

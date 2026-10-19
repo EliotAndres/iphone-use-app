@@ -177,6 +177,7 @@ struct AgentView: View {
         .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .onTapGesture { composerFocused = true }
         .glass(in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .sensoryFeedback(.start, trigger: voice.state) { _, new in new == .recording }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     }
