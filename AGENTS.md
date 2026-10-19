@@ -28,6 +28,11 @@ rebase onto `main` and fast-forward it (`git -C <main checkout> merge --ff-only 
 1. `scripts/build-idevice.sh` (once, or after changing `idevice-patch/`): builds `iPhoneUse/idevice/libidevice_ffi.a`, which is gitignored (45 MB).
 2. `xcodebuild -project iPhoneUse.xcodeproj -scheme iPhoneUse -destination id=<udid> -allowProvisioningUpdates build`, then `xcrun devicectl device install app`.
 
+Simulator (UI only, no device): `scripts/build-idevice.sh sim`, then build `-configuration Debug`
+with `LIBRARY_SEARCH_PATHS='$(PROJECT_DIR)/iPhoneUse/idevice/sim'` and launch with `-demoChat YES`
+(fake run, see README). Argent can't install from the session scratchpad; copy the `.app` into
+`.build/` (gitignored) first.
+
 On the phone, once: Developer Mode on, import a pairing file
 (`idevice-tools rppairing pair <name> <out>` over USB), allow the VPN configuration prompt,
 add an API key in Settings. The DDI downloads and mounts on its own.

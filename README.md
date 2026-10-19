@@ -22,6 +22,17 @@ over a CoreDevice tunnel, through a loopback VPN that ships inside the app.
    `iPhoneUse/idevice/libidevice_ffi.a` (gitignored). Needs rustup with the `aarch64-apple-ios` target.
 2. Open `iPhoneUse.xcodeproj`, set your team, run the `iPhoneUse` scheme on the phone.
 
+### Simulator (layout checks only)
+
+The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a fake run
+(placeholder screenshots, a question to answer), Debug builds only.
+
+1. `rustup target add aarch64-apple-ios-sim && scripts/build-idevice.sh sim`: the libs are
+   single-arch, so the simulator needs its own, in `iPhoneUse/idevice/sim/`.
+2. Build Debug (the scheme defaults to Release, which drops `-demoChat`) against that lib:
+   `xcodebuild -project iPhoneUse.xcodeproj -scheme iPhoneUse -configuration Debug -destination id=<sim udid> LIBRARY_SEARCH_PATHS='$(PROJECT_DIR)/iPhoneUse/idevice/sim' build`
+3. Install the `.app` from DerivedData and launch it with `-demoChat YES`.
+
 ## First run
 
 1. Settings (gear, top right) → Import Pairing File.

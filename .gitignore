@@ -99,6 +99,7 @@ iOSInjectionProject/
 ## iphone-use-app
 # built by scripts/build-idevice.sh
 iPhoneUse/idevice/libidevice_ffi.a
+iPhoneUse/idevice/sim/
 .build/
 scripts/*.png
 scripts/agent.log
