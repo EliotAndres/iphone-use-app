@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var hasPairingFile = Connection.shared.hasPairingFile
     @State private var isShowingPairingFilePicker = false
     @State private var pairingMessage: (text: String, isError: Bool)?
+    @State private var showClearHistoryConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -79,6 +80,10 @@ struct SettingsView: View {
                     Stepper("Max steps: \(llm.maxSteps)", value: $llm.maxSteps, in: 5...200, step: 5)
                     NavigationLink("System Prompt") { SystemPromptEditor(settings: llm) }
                     NavigationLink("Shortcuts & Deep Link") { ShortcutsGuideView() }
+                    Button("Clear History", role: .destructive) { showClearHistoryConfirmation = true }
+                        .confirmationDialog("Delete all chats?", isPresented: $showClearHistoryConfirmation, titleVisibility: .visible) {
+                            Button("Clear History", role: .destructive) { PhoneAgent.shared.clearHistory() }
+                        }
                 }
 
                 Section("About") {
