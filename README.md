@@ -97,17 +97,10 @@ open iPhoneUse.xcodeproj        # set your team, run the iPhoneUse scheme on the
 Type a goal, for example *"Open Settings and turn on Dark Mode"*, and send it. Stop it from the Dynamic Island
 or the chat.
 
-## Model and prompt
+<details>
+<summary><h2>Development</h2></summary>
 
-- OpenRouter (model picked from its list) or a custom OpenAI-compatible base URL (vLLM, llama.cpp, Ollama, cloud
-  APIs). The model needs image input and tool calls.
-- The key is stored in the Keychain, one per provider.
-- The system prompt and max steps are editable in Settings. The installed-app list is added to the prompt so the
-  model can open apps by bundle id.
-
-## Development
-
-### Scripted runs (no LLM)
+#### Scripted runs (no LLM)
 
 ```sh
 DEV=<udid> scripts/runscript.sh "open com.apple.Preferences; wait 1.5; tap 0.5 0.9; shot a" a
@@ -116,7 +109,7 @@ DEV=<udid> scripts/runscript.sh "open com.apple.Preferences; wait 1.5; tap 0.5 0
 Launches the app with `-agentScript`, waits for "script done" in `Documents/agent.log` and pulls the screenshots.
 `-agentPrompt "..."` as a launch argument starts a real run.
 
-### Simulator (layout checks only)
+#### Simulator (layout checks only)
 
 The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a fake run
 (placeholder screenshots, a question to answer), Debug builds only.
@@ -129,11 +122,7 @@ The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a
 
 Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
-## Roadmap
-
-- [x] Drop the separate VPN app: the loopback VPN ships in the app (LocalDevVPN still works for free Apple IDs)
-- [ ] Long runs: reconnect the heartbeat with backoff
-- [ ] Reboot test and 30-minute soak
+</details>
 
 ## Limitations
 
@@ -187,14 +176,6 @@ with `atos` against the dSYM of the exact build (the UUID in the report must mat
 
 Only automate devices and accounts you own or may use, and respect the terms of the apps involved. The agent acts
 with your hands: watch it, and keep Stop within reach.
-
-## Related projects
-
-| Project | Approach | Difference |
-|---|---|---|
-| [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent) | ESP32-S3 as AirPlay receiver + USB HID mouse, agent app on the phone | Needs a $7 board and AssistiveTouch; no Developer Mode |
-| [ja1chen/actell](https://github.com/ja1chen/actell) | Agent app on the iPhone via CoreDevice | Closest to this one |
-| [mobile-mcp](https://github.com/mobile-next/mobile-mcp), [Midscene](https://github.com/web-infra-dev/midscene) | WebDriverAgent / XCUITest | Need a Mac at run time |
 
 ## Credits
 
