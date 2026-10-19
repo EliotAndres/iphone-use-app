@@ -89,14 +89,23 @@ struct AgentView: View {
     private var entries: [ChatEntry] {
         guard let openRun else { return agent.entries }
         guard let run = agent.history.first(where: { $0.id == openRun }) else { return [] }
-        return run.entries ?? [ChatEntry(kind: .user, text: run.prompt), ChatEntry(kind: .step, text: run.log)]
+        return run.entries ?? [ChatEntry(kind: .user, text: run.prompt), ChatEntry(kind: .assistant, text: run.log)]
+    }
+
+    /// Consecutive steps collapse into one carousel row.
+    private var rows: [[ChatEntry]] {
+        entries.reduce(into: []) { rows, entry in
+            if entry.kind == .step, rows.last?.first?.kind == .step { rows[rows.count - 1].append(entry) } else { rows.append([entry]) }
+        }
     }
 
     private var chat: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(entries) { ChatRow(entry: $0) }
+                    ForEach(rows, id: \.first!.id) { row in
+                        if row[0].kind == .step { StepCarousel(steps: row) } else { ChatRow(entry: row[0]) }
+                    }
                     if agent.isRunning && openRun == nil { PulsingDots() }
                 }
                 .padding()
@@ -115,6 +124,18 @@ struct AgentView: View {
                     }
                     if let error = voice.error {
                         Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 20)
+                    }
+                    if agent.isRunning {
+                        Button { agent.stop() } label: {
+                            Label("Stop Session", systemImage: "stop.fill")
+                                .font(.title3.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
+                        .tint(.red)
+                        .padding(.horizontal, 12)
                     }
                     composer
                 }
@@ -159,14 +180,17 @@ struct AgentView: View {
         setMenu(false)
     }
 
+    /// While running, the composer only answers the agent's question.
+    private var composerEnabled: Bool { !agent.isRunning || agent.question != nil }
+
     private var canSend: Bool {
-        voice.state == .recording || voice.state == .idle && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        composerEnabled && (voice.state == .recording || voice.state == .idle && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
             if voice.state == .idle {
-                TextField("Ask anything", text: $prompt, axis: .vertical)
+                TextField(agent.question == nil ? "Ask anything" : "Answer", text: $prompt, axis: .vertical)
                     .lineLimit(1...6)
                     .focused($composerFocused)
                     .frame(minHeight: 34)
@@ -174,19 +198,18 @@ struct AgentView: View {
             } else {
                 Waveform(levels: voice.levels, transcribing: voice.state == .transcribing)
             }
-            if !agent.isRunning {
+            if composerEnabled {
                 MicButton(voice: voice, enabled: llm.voiceAvailable) { finishVoice(send: false) }
             }
-            Button(action: sendOrStop) {
-                Image(systemName: agent.isRunning ? "stop.fill" : "arrow.up")
+            Button(action: send) {
+                Image(systemName: "arrow.up")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color(.systemBackground))
                     .frame(width: 34, height: 34)
-                    .background(Circle().fill(agent.isRunning || canSend ? Color.primary : Color.secondary.opacity(0.4)))
+                    .background(Circle().fill(canSend ? Color.primary : Color.secondary.opacity(0.4)))
             }
-            .disabled(!agent.isRunning && !canSend)
-            .accessibilityLabel(agent.isRunning ? "Stop" : "Send")
-            .animation(.easeInOut(duration: 0.2), value: agent.isRunning)
+            .disabled(!canSend)
+            .accessibilityLabel(agent.question == nil ? "Send" : "Send answer")
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 10)
@@ -199,15 +222,19 @@ struct AgentView: View {
         .sensoryFeedback(.error, trigger: voice.error) { _, new in new != nil }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+        .onChange(of: agent.question) { _, question in
+            if question != nil { openRun = nil; setMenu(false); composerFocused = true }
+        }
     }
 
     // Every run starts fresh for the model, so sending always opens the live chat.
-    private func sendOrStop() {
-        if agent.isRunning { return agent.stop() }
+    // Mid-run, sending answers the agent's question instead.
+    private func send() {
         if voice.state == .recording { return finishVoice(send: true) }
         guard canSend else { return }
+        let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         openRun = nil
-        agent.run(prompt: prompt.trimmingCharacters(in: .whitespacesAndNewlines))
+        if agent.isRunning { agent.answer(text) } else { agent.run(prompt: text) }
         prompt = ""
         composerFocused = false
     }
@@ -217,7 +244,7 @@ struct AgentView: View {
         Task {
             guard let text = await voice.finish(), !text.isEmpty else { return }
             prompt = prompt.isEmpty ? text : prompt + " " + text
-            if send { sendOrStop() }
+            if send { self.send() }
         }
     }
 }
@@ -389,6 +416,60 @@ private struct ChatRow: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
+    }
+}
+
+/// A run's steps side by side, newest on the right and kept in view.
+private struct StepCarousel: View {
+    let steps: [ChatEntry]
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                // ponytail: non-lazy so cards keep their fade state; fine for maxSteps-sized runs.
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(steps) { StepCard(entry: $0).id($0.id) }
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.horizontal, -16) // bleed to the screen edges
+            .onAppear { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
+            .onChange(of: steps.count) {
+                withAnimation(.easeOut(duration: 0.4)) { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
+            }
+        }
+    }
+}
+
+private struct StepCard: View {
+    let entry: ChatEntry
+    @State private var image: UIImage?
+    @State private var shown = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if entry.shot == true {
+                Group {
+                    if let image { Image(uiImage: image).resizable() } else { Color(.secondarySystemFill) }
+                }
+                .aspectRatio(9 / 19.5, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
+            }
+            Text(entry.text)
+                .font(.caption.monospaced())
+                .lineLimit(3)
+            if let thought = entry.thought {
+                Text(thought).font(.caption).foregroundStyle(.secondary).lineLimit(4)
+            }
+        }
+        .frame(width: 150, alignment: .leading)
+        .textSelection(.enabled)
+        .opacity(shown ? 1 : 0)
+        .offset(y: shown ? 0 : 12)
+        .scaleEffect(shown ? 1 : 0.95)
+        .onAppear { withAnimation(.easeOut(duration: 0.45)) { shown = true } }
+        .task { if entry.shot == true { image = UIImage(contentsOfFile: entry.shotURL.path) } }
     }
 }
 

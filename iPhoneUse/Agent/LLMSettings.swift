@@ -43,7 +43,8 @@ final class LLMSettings: ObservableObject {
     must call exactly one tool. Coordinates are pixels in that screenshot (origin top-left). \
     Prefer open_app over hunting for icons. To type, first tap the text field so the keyboard \
     is up, then call type (ASCII only; "\\n" presses return). Before acting, write one short \
-    sentence of reasoning. Call done when the task is complete or impossible, with a summary.
+    sentence of reasoning. If you need information or a choice only the owner can give, call \
+    ask_user_question instead of guessing. Call done when the task is complete or impossible, with a summary.
     """
 
     private let defaults = UserDefaults.standard

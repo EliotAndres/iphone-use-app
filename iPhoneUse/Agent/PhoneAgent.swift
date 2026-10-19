@@ -27,6 +27,11 @@ struct ChatEntry: Identifiable, Codable {
     var id = UUID()
     let kind: Kind
     let text: String
+    var thought: String? // a step's reasoning
+    var shot: Bool? // a step's screenshot is at `shotURL`
+
+    static let shotsURL = URL.documentsDirectory.appending(path: "shots")
+    var shotURL: URL { Self.shotsURL.appending(path: "\(id).jpg") }
 }
 
 @MainActor
@@ -36,6 +41,9 @@ final class PhoneAgent: ObservableObject {
     @Published var log = ""
     @Published var entries: [ChatEntry] = []
     @Published var isRunning = false
+    /// Set while the model waits on `ask_user_question`; the composer answers it.
+    @Published private(set) var question: String?
+    private var answerWaiter: CheckedContinuation<String, Never>?
     @Published private(set) var history: [RunRecord] = []
     private var task: Task<Void, Never>?
     private var activity: Activity<AgentActivityAttributes>?
@@ -88,22 +96,46 @@ final class PhoneAgent: ObservableObject {
 
     func stop() {
         task?.cancel()
+        answer("")
+    }
+
+    func answer(_ text: String) {
+        question = nil
+        answerWaiter?.resume(returning: text)
+        answerWaiter = nil
+    }
+
+    private func waitForAnswer(_ text: String) async -> String {
+        await withCheckedContinuation { waiter in
+            if Task.isCancelled { return waiter.resume(returning: "") }
+            question = text
+            answerWaiter = waiter
+        }
     }
 
     func deleteRun(_ id: UUID) {
+        removeShots(history.filter { $0.id == id })
         history.removeAll { $0.id == id }
         try? JSONEncoder().encode(history).write(to: Self.historyURL, options: .atomic)
     }
 
     func clearHistory() {
+        removeShots(history)
         history = []
         try? FileManager.default.removeItem(at: Self.historyURL)
     }
 
     private func record(_ run: RunRecord) {
         history.insert(run, at: 0)
+        removeShots(Array(history.dropFirst(Self.historyLimit)))
         history = Array(history.prefix(Self.historyLimit))
         try? JSONEncoder().encode(history).write(to: Self.historyURL, options: .atomic)
+    }
+
+    private func removeShots(_ runs: [RunRecord]) {
+        for entry in runs.flatMap({ $0.entries ?? [] }) where entry.shot == true {
+            try? FileManager.default.removeItem(at: entry.shotURL)
+        }
     }
 
     // Silent audio / low-accuracy location keep us alive while other apps are in front.
@@ -189,11 +221,19 @@ final class PhoneAgent: ObservableObject {
     }
 
     /// Appends to the chat (as `text`, defaulting to `line`), the log and the Live Activity.
-    nonisolated private func say(_ line: String, step: Int? = nil, as kind: ChatEntry.Kind = .step, text: String? = nil) async {
-        let stamped = "\(Date().formatted(date: .omitted, time: .standard)) \(line)\n"
-        await MainActor.run {
+    /// A step can carry its reasoning and its screenshot (JPEG), shown together in the carousel.
+    nonisolated private func say(_ line: String, step: Int? = nil, as kind: ChatEntry.Kind = .step, text: String? = nil,
+                                 thought: String? = nil, image: Data? = nil) async {
+        let time = Date().formatted(date: .omitted, time: .standard)
+        let stamped = (thought.map { "\(time) · \($0)\n" } ?? "") + "\(time) \(line)\n"
+        var entry = ChatEntry(kind: kind, text: text ?? line, thought: thought)
+        if let image {
+            try? FileManager.default.createDirectory(at: ChatEntry.shotsURL, withIntermediateDirectories: true)
+            entry.shot = (try? image.write(to: entry.shotURL)) != nil
+        }
+        await MainActor.run { [entry] in
             self.log += stamped
-            self.entries.append(ChatEntry(kind: kind, text: text ?? line))
+            self.entries.append(entry)
             self.updateActivity(line: line, step: step)
         }
         if let handle = try? FileHandle(forWritingTo: Self.logURL) {
@@ -260,12 +300,23 @@ final class PhoneAgent: ObservableObject {
             }
             let args = (function["arguments"] as? String)
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]
-            if let thought = reply["content"] as? String, !thought.isEmpty { await say("· \(thought)", step: step, as: .assistant, text: thought) }
-            await say(String(format: "%d %@ %@  (shot %.1fs, llm %.1fs)", step, name, Self.compact(args), tShot, tLLM), step: step)
+            let thought = (reply["content"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            await say(String(format: "%d %@ %@  (shot %.1fs, llm %.1fs)", step, name, Self.compact(args), tShot, tLLM), step: step,
+                      text: "\(step). \(name) \(Self.compact(args))", thought: thought, image: image.data)
 
             if name == "done" {
                 try? device.agentLaunch(bundleID: Bundle.main.bundleIdentifier ?? "")
                 return "done: \(args["summary"] as? String ?? "")"
+            }
+            if name == "ask_user_question" {
+                let question = args["question"] as? String ?? ""
+                try? device.agentLaunch(bundleID: Bundle.main.bundleIdentifier ?? "")
+                await say("question: \(question)", step: step, as: .assistant, text: question)
+                let answer = await waitForAnswer(question)
+                if Task.isCancelled { return "stopped" }
+                await say("answer: \(answer)", as: .user, text: answer)
+                messages.append(["role": "tool", "tool_call_id": callID, "content": "The user answered: \(answer)"])
+                continue
             }
             let result: String
             do {
@@ -394,6 +445,9 @@ final class PhoneAgent: ObservableObject {
             tool("type", "Type text into the focused field.", ["text": "text to type"], ["text": "string"]),
             tool("home", "Go to the home screen.", [:]),
             tool("open_app", "Launch an installed app by bundle id.", ["bundle_id": "bundle id"], ["bundle_id": "string"]),
+            tool("ask_user_question", "Ask the phone's owner for missing information or a decision, then wait for the answer. "
+                 + "This app comes to the front while waiting, so reopen the app you were using afterwards.",
+                 ["question": "the question to show the user"], ["question": "string"]),
             tool("done", "Finish.", ["summary": "what happened"], ["summary": "string"]),
         ]
     }()
