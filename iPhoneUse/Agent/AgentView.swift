@@ -452,6 +452,7 @@ private struct ChatRow: View {
 /// A run's steps side by side, newest on the right and kept in view.
 private struct StepCarousel: View {
     let steps: [ChatEntry]
+    @State private var viewing: ChatEntry.ID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -460,7 +461,7 @@ private struct StepCarousel: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     // ponytail: non-lazy so cards keep their fade state; fine for maxSteps-sized runs.
                     HStack(alignment: .top, spacing: 14) {
-                        ForEach(steps) { StepCard(entry: $0).id($0.id) }
+                        ForEach(steps) { step in StepCard(entry: step, open: { viewing = step.id }).id(step.id) }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
@@ -473,11 +474,58 @@ private struct StepCarousel: View {
             }
         }
         .padding(.vertical, 12)
+        .fullScreenCover(isPresented: Binding(get: { viewing != nil }, set: { if !$0 { viewing = nil } })) {
+            ShotViewer(shots: steps.filter { $0.shot == true }, selection: $viewing)
+        }
+    }
+}
+
+/// Full screen screenshots of a run, swiped left and right, dots on top for position.
+private struct ShotViewer: View {
+    let shots: [ChatEntry]
+    @Binding var selection: ChatEntry.ID?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        TabView(selection: $selection) {
+            ForEach(shots) { shot in
+                Group {
+                    if let image = UIImage(contentsOfFile: shot.shotURL.path) {
+                        Image(uiImage: image).resizable().scaledToFit()
+                    }
+                }
+                .tag(Optional(shot.id))
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .background(.black)
+        .overlay(alignment: .top) {
+            HStack {
+                let index = shots.firstIndex { $0.id == selection } ?? 0
+                if shots.count <= 20 {
+                    HStack(spacing: 6) {
+                        ForEach(shots.indices, id: \.self) { i in
+                            Circle().fill(.white.opacity(i == index ? 1 : 0.35)).frame(width: 7, height: 7)
+                        }
+                    }
+                } else {
+                    Text("\(index + 1) / \(shots.count)").font(.footnote.monospacedDigit()).foregroundStyle(.white)
+                }
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark").font(.headline).foregroundStyle(.white).padding(10)
+                }
+                .accessibilityLabel("Close")
+            }
+            .padding(.horizontal)
+        }
+        .statusBarHidden()
     }
 }
 
 private struct StepCard: View {
     let entry: ChatEntry
+    let open: () -> Void
     @State private var image: UIImage?
     @State private var shown = false
 
@@ -490,6 +538,7 @@ private struct StepCard: View {
                 .aspectRatio(9 / 19.5, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
+                .onTapGesture(perform: open)
             }
             Text(entry.text)
                 .font(.caption.monospaced())
