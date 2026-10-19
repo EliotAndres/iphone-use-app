@@ -4,7 +4,7 @@
 
 # iphone-use-app
 
-**Let an AI model use your iPhone, from the iPhone itself. No Mac, no extra hardware, no jailbreak.**
+**Let an AI model use your iPhone, from the iPhone itself. No Mac at run time (one-time pairing only), no extra hardware, no jailbreak.**
 
 ![iOS](https://img.shields.io/badge/iOS-26%2B-black)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
@@ -23,7 +23,8 @@ types the destination, picks it and stops at the ride options. Middle: the finis
 
 ## Features
 
-- **No computer needed:** the agent runs on the iPhone and controls that same iPhone, no extra hardware or jailbreak
+- **No computer at run time:** the agent runs on the iPhone and controls that same iPhone, no extra hardware or jailbreak.
+  A Mac is only needed once, to make the pairing file
 - **Start it from anywhere:** the chat, Siri, the "Run Agent" Shortcut or an `iphoneuse://run?prompt=…` link.
 
 ## Requirements
@@ -74,8 +75,11 @@ A Live Activity shows progress with a Stop button, and every run is saved as a c
 
 ### 1. Make a pairing file
 
-The phone only opens its developer services to a trusted host. The pairing file holds the keys of such a host,
-so the app can act as one for its own phone. Plug the phone into the Mac, unlock it (tap Trust if asked), then:
+This is the one step that needs a Mac. There is no supported on-device API for the phone's developer services:
+the phone only opens them to a trusted host, the way it does for Xcode. The pairing file holds the keys of such a
+host, so the app can act as one for its own phone. Since iOS 17 these services are reached over a network tunnel
+(RemoteXPC/CoreDevice, the same path as Xcode's wireless debugging) rather than the USB mux, which is why the app
+can reach them through its loopback VPN with no cable. Plug the phone into the Mac, unlock it (tap Trust if asked), then:
 
 ```sh
 git clone https://github.com/jkcoxson/idevice && cd idevice
@@ -83,6 +87,7 @@ cargo build --release -p idevice-tools --bin idevice-tools
 ./target/release/idevice-tools rppairing pair my-mac pairingFile.plist
 ```
 
+The file keeps working until the phone stops trusting that host (Reset Location & Privacy, Developer Mode turned off).
 Make a new one if the app says the pairing file is invalid or expired.
 
 ### 2. Build and install the app
