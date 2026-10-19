@@ -137,6 +137,8 @@ Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Limitations
 
+- Requires a convenience shortcut when on cellular: iOS refuses new loopback VPN connections on cellular data,
+  so the app runs a Cellular Toggle shortcut that turns data off while it connects, then back on (or turn it off by hand).
 - Requires a loopback VPN (the built-in one, or [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044)),
   so you can't use another VPN while the agent runs: iOS allows one at a time, and Tailscale and similar stop
   while it is on.
