@@ -11,10 +11,30 @@ over a CoreDevice tunnel, through a loopback VPN that ships inside the app.
 
 - iOS 17.4+, Developer Mode on, Wi-Fi on
 - A paid Apple developer team (the built-in VPN needs the Network Extension entitlement)
-- A remote pairing file for the phone, made once over USB:
-  `idevice-tools rppairing pair <name> <out>` ([guide](https://github.com/StikDebug/StikDebug-Guide/blob/main/pairing_file.md))
+- A remote pairing file for the phone (see below)
 - An API key for [OpenRouter](https://openrouter.ai/settings/keys), or any OpenAI-compatible
   endpoint whose model takes images and tool calls
+
+## Pairing file
+
+The phone only opens its developer services (screenshots, touch, keyboard) to a trusted
+host. The pairing file holds the keys of such a host, so the app can act as one for its own
+phone. Make it once from a Mac with the phone plugged in over USB and unlocked (tap Trust if asked):
+
+```sh
+git clone https://github.com/jkcoxson/idevice && cd idevice
+cargo build --release -p idevice-tools --bin idevice-tools
+./target/release/idevice-tools rppairing pair my-mac pairingFile.plist
+```
+
+Then import it in the app (below), or, once the app is installed, copy it into its Documents folder:
+
+```sh
+xcrun devicectl device copy to --device <udid> --domain-type appDataContainer \
+  --domain-identifier blog.eliot.iphoneuse --source pairingFile.plist --destination Documents/pairingFile.plist
+```
+
+Make a new one if the app says the pairing file is invalid or expired.
 
 ## Build
 
@@ -35,7 +55,7 @@ The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a
 
 ## First run
 
-1. Settings (gear, top right) → Import Pairing File.
+1. Settings (gear, top right) → Import Pairing File (skip if you copied it over).
 2. Allow the "Add VPN Configuration" prompt. The VPN only routes `10.7.0.1` back to the phone.
 3. Settings → Model: pick a provider, paste the API key, pick a model.
 4. Back in the chat: wait until the "not connected" line above the input disappears (the developer disk image downloads on first run), then type a prompt and send it.
