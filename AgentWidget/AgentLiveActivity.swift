@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -20,6 +21,7 @@ struct AgentLiveActivity: Widget {
                     Spacer()
                     StatusText(context: context)
                         .font(.caption.bold())
+                    StopButton(context: context)
                 }
                 Text(context.attributes.prompt)
                     .font(.headline)
@@ -37,8 +39,11 @@ struct AgentLiveActivity: Widget {
                         .font(.headline)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    StatusText(context: context)
-                        .font(.headline)
+                    HStack {
+                        StatusText(context: context)
+                            .font(.headline)
+                        StopButton(context: context)
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -73,6 +78,20 @@ private struct StatusText: View {
                 .monospacedDigit()
         } else {
             Text("Finished")
+        }
+    }
+}
+
+private struct StopButton: View {
+    let context: ActivityViewContext<AgentActivityAttributes>
+
+    var body: some View {
+        if context.state.running {
+            Button(intent: StopAgentIntent()) {
+                Image(systemName: "stop.fill")
+            }
+            .tint(.red)
+            .accessibilityLabel("Stop agent")
         }
     }
 }

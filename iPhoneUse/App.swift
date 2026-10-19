@@ -1,0 +1,41 @@
+//
+//  App.swift
+//  iPhoneUse
+//
+
+import SwiftUI
+
+@main
+struct IPhoneUseApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var wasInBackground = false
+
+    init() {
+        UserDefaults.standard.register(defaults: ["keepAliveAudio": true, "keepAliveLocation": true])
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            TabView {
+                AgentView()
+                    .tabItem { Label("Agent", systemImage: "sparkles") }
+                SettingsView()
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .background:
+                    wasInBackground = true
+                case .active where wasInBackground:
+                    // The tunnel often dies while suspended. Don't swap it under a running agent.
+                    wasInBackground = false
+                    if !PhoneAgent.shared.isRunning {
+                        Task { await Connection.shared.connect(force: true) }
+                    }
+                default:
+                    break
+                }
+            }
+        }
+    }
+}
