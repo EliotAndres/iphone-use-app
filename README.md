@@ -85,11 +85,14 @@ with `atos` against the dSYM of the exact build (the UUID in the report must mat
 
 ```mermaid
 flowchart LR
-  P["Prompt, Siri or Shortcut"] --> A["Agent loop<br/>(iphone-use-app)"]
-  A -- "image + history" --> M["Vision model"]
-  M -- "tool call: tap, swipe,<br/>type, open_app, done" --> A
-  A <-- "screenshot / input" --> V["Loopback VPN<br/>10.7.0.1"]
-  V <-- "pairing file = trusted host" --> C["CoreDevice services<br/>of the same iPhone"]
+  subgraph App["iphone-use-app"]
+    L["LLM calling"]
+    D["Mount developer image"]
+    O["Orchestrator"]
+  end
+  L <-- "screenshot + history /<br/>tool call" --> R["OpenRouter"]
+  D -- "DDI mount" --> V["Loopback VPN<br/>10.7.0.1"]
+  O <-- "screenshot / tap, swipe, type" --> V
 ```
 
 - **Eyes: CoreDevice screenshots.** The app asks the phone's developer services for a screenshot.
