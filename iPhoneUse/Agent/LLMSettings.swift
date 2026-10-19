@@ -104,6 +104,21 @@ final class LLMSettings: ObservableObject {
                          maxSteps: max(1, maxSteps), systemPrompt: systemPrompt)
     }
 
+    /// Checks the key against the endpoint. OpenRouter's /key rejects bad keys; /models is public there.
+    func testConnection() async -> (text: String, isError: Bool) {
+        let path = provider == .openRouter ? "/key" : "/models"
+        guard let url = URL(string: baseURL + path), url.host != nil else { return ("Set a base URL first.", true) }
+        var request = URLRequest(url: url)
+        if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            return (200..<300).contains(status) ? ("Connected.", false) : ("Failed: HTTP \(status).", true)
+        } catch {
+            return ("Failed: \(error.localizedDescription)", true)
+        }
+    }
+
     func loadModels() async {
         guard let url = URL(string: baseURL + "/models"), url.host != nil else { return }
         loadingModels = true

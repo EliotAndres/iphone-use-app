@@ -31,7 +31,7 @@ struct SettingsView: View {
             Form {
                 Section {
                     NavigationLink { LLMSettingsView(settings: llm) } label: {
-                        CheckRow("AI model", detail: llm.problem ?? "\(llm.provider.title) · \(llm.model)",
+                        CheckRow("Model API Key", detail: llm.problem ?? "\(llm.provider.title) · \(llm.model)",
                                  state: llm.problem == nil ? .done : .error)
                     }
                     Button { isShowingPairingFilePicker = true } label: {
@@ -184,6 +184,8 @@ private extension Connection.Step {
 
 private struct LLMSettingsView: View {
     @ObservedObject var settings: LLMSettings
+    @State private var isTesting = false
+    @State private var testMessage: (text: String, isError: Bool)?
 
     var body: some View {
         Form {
@@ -207,8 +209,27 @@ private struct LLMSettingsView: View {
             }
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
+
+            Section {
+                Button(settings.provider == .openRouter ? "Test OpenRouter Connection" : "Test Connection") {
+                    isTesting = true
+                    testMessage = nil
+                    Task {
+                        testMessage = await settings.testConnection()
+                        isTesting = false
+                    }
+                }
+                .disabled(isTesting)
+                if isTesting {
+                    ProgressView()
+                } else if let testMessage {
+                    Text(testMessage.text)
+                        .font(.caption)
+                        .foregroundStyle(testMessage.isError ? .red : .green)
+                }
+            }
         }
-        .navigationTitle("AI Model")
+        .navigationTitle("Model API Key")
         .scrollDismissesKeyboard(.interactively)
     }
 }
