@@ -22,7 +22,7 @@ doesn't need stays out, to keep the code and the binary small.
 ### Outside the app
 - Live Activity / Dynamic Island showing the current step
 - Stop button in the Live Activity *(new)*
-- "Run Agent" Shortcut / Siri intent
+- "Run Agent" Shortcut / Siri intent, `iphoneuse://run?prompt=...` deep link (new session), guide in the drawer and Settings
 
 ### Settings
 - Setup checklist on top, each row ✓ / ⚠ / ✗ and opening the screen that fixes it: AI model, pairing file,

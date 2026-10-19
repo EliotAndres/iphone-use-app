@@ -78,6 +78,7 @@ struct SettingsView: View {
                 Section("Agent") {
                     Stepper("Max steps: \(llm.maxSteps)", value: $llm.maxSteps, in: 5...200, step: 5)
                     NavigationLink("System Prompt") { SystemPromptEditor(settings: llm) }
+                    NavigationLink("Shortcuts & Deep Link") { ShortcutsGuideView() }
                 }
 
                 Section("About") {

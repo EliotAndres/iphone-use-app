@@ -20,6 +20,7 @@ struct AgentView: View {
     @State private var menuOpen = false
     @State private var drag: CGFloat = 0
     @State private var showSettings = false
+    @State private var showShortcutsGuide = false
 
     var body: some View {
         GeometryReader { geo in
@@ -27,7 +28,8 @@ struct AgentView: View {
             let offset = min(max((menuOpen ? menuWidth : 0) + drag, 0), menuWidth)
             ZStack(alignment: .leading) {
                 ChatList(agent: agent, width: menuWidth, openRun: openRun, select: select,
-                         reuse: { prompt = $0; select(nil) }, needsSetup: needsSetup, openSettings: { showSettings = true })
+                         reuse: { prompt = $0; select(nil) }, needsSetup: needsSetup, openSettings: { showSettings = true },
+                         openShortcutsGuide: { showShortcutsGuide = true })
                     .accessibilityHidden(!menuOpen)
                 // The mask reaches the screen edges, so the rounded corners follow the
                 // display's instead of clipping the toolbar buttons.
@@ -56,6 +58,20 @@ struct AgentView: View {
             .background(Color(.secondarySystemBackground))
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showShortcutsGuide) {
+            NavigationStack {
+                ShortcutsGuideView().toolbar { Button("Done") { showShortcutsGuide = false } }
+            }
+        }
+        // iphoneuse://run?prompt=... starts a new session, like the Run Agent intent.
+        .onOpenURL { url in
+            guard let linked = DeepLink.prompt(from: url), !agent.isRunning else { return }
+            showSettings = false
+            showShortcutsGuide = false
+            openRun = nil
+            setMenu(false)
+            agent.run(prompt: linked)
+        }
         .task {
             await connection.connect()
             // Test hooks: `devicectl device process launch ... -agentScript "..."` (no LLM, see
@@ -274,6 +290,7 @@ private struct ChatList: View {
     let reuse: (String) -> Void
     let needsSetup: Bool
     let openSettings: () -> Void
+    let openShortcutsGuide: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -310,6 +327,18 @@ private struct ChatList: View {
             .overlay {
                 if agent.history.isEmpty { Text("No sessions yet").foregroundStyle(.secondary) }
             }
+            Button(action: openShortcutsGuide) {
+                HStack {
+                    Label("Connect shortcuts, deeplink", systemImage: "link")
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
             HStack {
                 Button { select(nil) } label: {
                     Label("Chat", systemImage: "square.and.pencil")
