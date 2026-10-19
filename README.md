@@ -179,14 +179,14 @@ with your hands: watch it, and keep Stop within reach.
 
 ## Credits
 
-- [StikDebug](https://github.com/StephenDev0/StikDebug) by Stephen and contributors: the tunnel, pairing file
-  and developer disk image code is based on it.
-- [idevice](https://github.com/jkcoxson/idevice) by jkcoxson: the Rust library behind every device call.
-- [LocalDevVPN](https://github.com/jkcoxson/LocalDevVPN) / StosVPN by the SideStore Team and Stossy11:
-  the loopback VPN (`TunnelProvider/`) is based on StosVPN.
-- [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent) by Henry Yuan: the model provider
-  and model picker design, and the layout of this README.
-- [DeveloperDiskImage](https://github.com/doronz88/DeveloperDiskImage) by doronz88: developer disk images.
+| Project | Repo | Used for |
+|---|---|---|
+| StikDebug, by Stephen and contributors | [StikDebug/StikDebug](https://github.com/StikDebug/StikDebug) | The tunnel, pairing file and developer disk image code is based on it |
+| idevice, by jkcoxson | [jkcoxson/idevice](https://github.com/jkcoxson/idevice) | The Rust library behind every device call |
+| StosVPN, by the SideStore Team and Stossy11 | [SideStore/StosVPN](https://github.com/SideStore/StosVPN) | The loopback VPN (`TunnelProvider/`) is based on it |
+| LocalDevVPN, by jkcoxson | [jkcoxson/LocalDevVPN](https://github.com/jkcoxson/LocalDevVPN) | The VPN app for free Apple IDs; our tunnel came from StosVPN through it |
+| esp32-iphone-agent, by Henry Yuan | [onehumanbeing/esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent) | The model provider and model picker design, and the layout of this README |
+| DeveloperDiskImage, by doronz88 | [doronz88/DeveloperDiskImage](https://github.com/doronz88/DeveloperDiskImage) | Developer disk images |
 
 ## License
 
