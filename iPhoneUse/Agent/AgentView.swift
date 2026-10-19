@@ -57,6 +57,7 @@ struct AgentView: View {
                     }
             )
             .onPreferenceChange(CarouselFramesKey.self) { carousels.frames = $0 }
+            .sensoryFeedback(.impact(weight: .light), trigger: menuOpen)
             // Distinct from the chat's systemBackground so the panels separate in dark mode,
             // where the shadow is invisible.
             .background(Color(.secondarySystemBackground))
@@ -177,7 +178,7 @@ struct AgentView: View {
                     prompt = text
                     send()
                 } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    HStack(spacing: 12) {
                         // Fixed width: the symbols differ in width, the texts should still line up.
                         Image(systemName: icon).foregroundStyle(tint).frame(width: 24)
                         Text(text).foregroundStyle(.secondary).multilineTextAlignment(.leading)
