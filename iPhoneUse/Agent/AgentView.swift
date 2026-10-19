@@ -116,9 +116,7 @@ struct AgentView: View {
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .overlay {
-                if entries.isEmpty {
-                    Text("What should I do?").font(.title2.weight(.semibold))
-                }
+                if entries.isEmpty { suggestions }
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 8) {
@@ -158,6 +156,36 @@ struct AgentView: View {
                 }
             }
         }
+    }
+
+    private static let suggestions = [
+        ("message.fill", Color.green, "List my unread WhatsApp conversations (don't open them)"),
+        ("car.fill", Color.primary, "Get me an Uber to the closest supermarket"),
+        ("creditcard.fill", Color.blue, "Show me my Apple subscriptions, recommend which ones to cancel"),
+    ]
+
+    /// Starter prompts on a new chat, sitting just above the composer.
+    private var suggestions: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Self.suggestions, id: \.2) { icon, tint, text in
+                Button {
+                    prompt = text
+                    send()
+                } label: {
+                    Label { Text(text).foregroundStyle(.secondary).multilineTextAlignment(.leading) } icon: {
+                        Image(systemName: icon).foregroundStyle(tint)
+                    }
+                    .font(.body)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 24)
+        .frame(maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 8)
     }
 
     /// Red dot on the gear: something in the Settings checklist stops the agent from running.
