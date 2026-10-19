@@ -28,7 +28,7 @@ struct ModelPicker: View {
     }
 }
 
-private struct ModelSelectionView: View {
+struct ModelSelectionView: View {
     @ObservedObject var settings: LLMSettings
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""

@@ -17,6 +17,15 @@ struct RunRecord: Codable, Identifiable {
     var model: String
     var outcome: String
     var log: String
+    var entries: [ChatEntry]? // nil for runs recorded before the chat UI
+}
+
+/// One line of the chat: the user's prompt, the agent's words, or a step it took.
+struct ChatEntry: Identifiable, Codable {
+    enum Kind: String, Codable { case user, assistant, step }
+    var id = UUID()
+    let kind: Kind
+    let text: String
 }
 
 @MainActor
@@ -24,6 +33,7 @@ final class PhoneAgent: ObservableObject {
     static let shared = PhoneAgent()
 
     @Published var log = ""
+    @Published var entries: [ChatEntry] = []
     @Published var isRunning = false
     @Published private(set) var history: [RunRecord] = []
     private var task: Task<Void, Never>?
@@ -43,6 +53,7 @@ final class PhoneAgent: ObservableObject {
         guard !isRunning else { return }
         isRunning = true
         log = ""
+        entries = []
         let settings = LLMSettings.shared
         let model = settings.model
         startKeepAlive()
@@ -64,8 +75,8 @@ final class PhoneAgent: ObservableObject {
                     outcome = "error: invalid settings"
                 }
             }
-            await say(outcome)
-            record(RunRecord(date: .now, prompt: prompt, model: model, outcome: outcome, log: log))
+            await say(outcome, as: .assistant, text: outcome.hasPrefix("done: ") ? String(outcome.dropFirst(6)) : outcome)
+            record(RunRecord(date: .now, prompt: prompt, model: model, outcome: outcome, log: log, entries: entries))
             stopKeepAlive()
             isRunning = false
             endActivity()
@@ -74,6 +85,11 @@ final class PhoneAgent: ObservableObject {
 
     func stop() {
         task?.cancel()
+    }
+
+    func deleteRun(_ id: UUID) {
+        history.removeAll { $0.id == id }
+        try? JSONEncoder().encode(history).write(to: Self.historyURL, options: .atomic)
     }
 
     func clearHistory() {
@@ -169,10 +185,12 @@ final class PhoneAgent: ObservableObject {
         isRunning = false
     }
 
-    nonisolated private func say(_ line: String, step: Int? = nil) async {
+    /// Appends to the chat (as `text`, defaulting to `line`), the log and the Live Activity.
+    nonisolated private func say(_ line: String, step: Int? = nil, as kind: ChatEntry.Kind = .step, text: String? = nil) async {
         let stamped = "\(Date().formatted(date: .omitted, time: .standard)) \(line)\n"
         await MainActor.run {
             self.log += stamped
+            self.entries.append(ChatEntry(kind: kind, text: text ?? line))
             self.updateActivity(line: line, step: step)
         }
         if let handle = try? FileHandle(forWritingTo: Self.logURL) {
@@ -187,7 +205,7 @@ final class PhoneAgent: ObservableObject {
     /// Returns the outcome line for the history.
     nonisolated private func loop(prompt: String, config: LLMConfig) async -> String {
         let device = DeviceSession.shared
-        await say("task: \(prompt)")
+        await say("task: \(prompt)", as: .user, text: prompt)
 
         let apps: [String: String]
         do {
@@ -239,7 +257,7 @@ final class PhoneAgent: ObservableObject {
             }
             let args = (function["arguments"] as? String)
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]
-            if let thought = reply["content"] as? String, !thought.isEmpty { await say("· \(thought)", step: step) }
+            if let thought = reply["content"] as? String, !thought.isEmpty { await say("· \(thought)", step: step, as: .assistant, text: thought) }
             await say(String(format: "%d %@ %@  (shot %.1fs, llm %.1fs)", step, name, Self.compact(args), tShot, tLLM), step: step)
 
             if name == "done" {

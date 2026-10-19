@@ -2,52 +2,56 @@
 //  AgentView.swift
 //  iPhoneUse
 //
+//  ChatGPT-style layout, after github.com/PallavAg/Apple-Intelligence-Chat:
+//  bubbles for the user, plain text for the agent, a floating glass composer,
+//  and past runs in a chat list that slides in from the left.
+//
 
 import SwiftUI
 
 struct AgentView: View {
     @ObservedObject private var agent = PhoneAgent.shared
     @ObservedObject private var connection = Connection.shared
+    @ObservedObject private var llm = LLMSettings.shared
     @State private var prompt = ""
-    @State private var showingHistory = false
+    @FocusState private var composerFocused: Bool
+    @State private var openRun: RunRecord.ID? // nil = the live chat
+    @State private var menuOpen = false
+    @State private var drag: CGFloat = 0
+    @State private var showSettings = false
+    @State private var showModels = false
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                ConnectionStatus(connection: connection)
-                TextField("What should I do?", text: $prompt, axis: .vertical)
-                    .lineLimit(2...5)
-                    .textFieldStyle(.roundedBorder)
-                if agent.isRunning {
-                    Button("Stop", role: .destructive) { agent.stop() }
-                        .buttonStyle(.borderedProminent)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Button("Run") { agent.run(prompt: prompt) }
-                        .buttonStyle(.borderedProminent)
-                        .frame(maxWidth: .infinity)
-                        .disabled(prompt.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        Text(agent.log)
-                            .font(.caption.monospaced())
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                        Color.clear.frame(height: 1).id("end")
+        GeometryReader { geo in
+            let menuWidth = min(geo.size.width * 0.8, 340)
+            let offset = min(max((menuOpen ? menuWidth : 0) + drag, 0), menuWidth)
+            ZStack(alignment: .leading) {
+                ChatList(agent: agent, width: menuWidth, openRun: openRun, select: select,
+                         reuse: { prompt = $0; select(nil) }, openSettings: { showSettings = true })
+                    .accessibilityHidden(!menuOpen)
+                chat
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: offset > 0 ? 44 : 0, style: .continuous))
+                    .shadow(color: .black.opacity(offset > 0 ? 0.15 : 0), radius: 12)
+                    .overlay {
+                        if menuOpen { Color.black.opacity(0.001).onTapGesture { setMenu(false) } }
                     }
-                    .onChange(of: agent.log) { proxy.scrollTo("end") }
-                }
-            }
-            .padding()
-            .navigationTitle("Agent")
-            .toolbar {
-                Button("History", systemImage: "clock.arrow.circlepath") { showingHistory = true }
-            }
-            .sheet(isPresented: $showingHistory) {
-                HistoryView(agent: agent) { prompt = $0 }
+                    .offset(x: offset)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 20)
+                            .onChanged { g in
+                                if abs(g.translation.width) > abs(g.translation.height) { drag = g.translation.width }
+                            }
+                            .onEnded { _ in
+                                let open = drag > 80 || (menuOpen && drag > -80)
+                                withAnimation(.snappy) { menuOpen = open; drag = 0 }
+                                if open { composerFocused = false }
+                            }
+                    )
             }
         }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showModels) { ModelSelectionView(settings: llm) }
         .task {
             await connection.connect()
             // Test hooks: `devicectl device process launch ... -agentScript "..."` (no LLM, see
@@ -57,9 +61,247 @@ struct AgentView: View {
             if let script = launchArgs["agentScript"] as? String {
                 agent.runScript(script)
             } else if let auto = launchArgs["agentPrompt"] as? String, !auto.isEmpty {
-                prompt = auto
                 agent.run(prompt: auto)
             }
+        }
+    }
+
+    private var entries: [ChatEntry] {
+        guard let openRun else { return agent.entries }
+        guard let run = agent.history.first(where: { $0.id == openRun }) else { return [] }
+        return run.entries ?? [ChatEntry(kind: .user, text: run.prompt), ChatEntry(kind: .step, text: run.log)]
+    }
+
+    private var chat: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(entries) { ChatRow(entry: $0) }
+                    if agent.isRunning && openRun == nil { PulsingDots() }
+                }
+                .padding()
+            }
+            .defaultScrollAnchor(.bottom)
+            .scrollDismissesKeyboard(.interactively)
+            .overlay {
+                if entries.isEmpty {
+                    Text("What should I do?").font(.title2.weight(.semibold))
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 8) {
+                    if !isConnected {
+                        ConnectionStatus(connection: connection).padding(.horizontal, 20)
+                    }
+                    composer
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Chats", systemImage: "line.3.horizontal") { setMenu(true) }
+                }
+                ToolbarItem(placement: .principal) {
+                    Button { showModels = true } label: {
+                        HStack(spacing: 4) {
+                            // "anthropic/claude-sonnet-5.5" -> "claude-sonnet-5.5"
+                            Text(llm.model.isEmpty ? "Choose a model" : llm.model.split(separator: "/").last.map(String.init) ?? llm.model)
+                                .fontWeight(.semibold)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down").font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(.primary)
+                    }
+                    .accessibilityLabel("Model: \(llm.model)")
+                }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("New Chat", systemImage: "square.and.pencil") { select(nil) }
+                        .disabled(openRun == nil && (agent.entries.isEmpty || agent.isRunning))
+                    Button("Settings", systemImage: "gearshape") { showSettings = true }
+                }
+            }
+        }
+    }
+
+    private var isConnected: Bool {
+        if case .ready = connection.step { true } else { false }
+    }
+
+    private func setMenu(_ open: Bool) {
+        if open { composerFocused = false }
+        withAnimation(.snappy) { menuOpen = open }
+    }
+
+    /// Shows a past run, or for nil the live chat (cleared when nothing is running).
+    private func select(_ id: RunRecord.ID?) {
+        if id == nil, openRun == nil, !agent.isRunning { agent.entries = [] }
+        openRun = id
+        setMenu(false)
+    }
+
+    private var canSend: Bool { !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private var composer: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Ask anything", text: $prompt, axis: .vertical)
+                .lineLimit(1...6)
+                .focused($composerFocused)
+                .padding(.vertical, 10)
+                .padding(.leading, 6)
+            Button(action: sendOrStop) {
+                Image(systemName: agent.isRunning ? "stop.fill" : "arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(.systemBackground))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(agent.isRunning || canSend ? Color.primary : Color.secondary.opacity(0.4)))
+            }
+            .disabled(!agent.isRunning && !canSend)
+            .accessibilityLabel(agent.isRunning ? "Stop" : "Send")
+            .animation(.easeInOut(duration: 0.2), value: agent.isRunning)
+        }
+        .padding(6)
+        .padding(.leading, 8)
+        .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .onTapGesture { composerFocused = true }
+        .glass(in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+
+    // Every run starts fresh for the model, so sending always opens the live chat.
+    private func sendOrStop() {
+        if agent.isRunning { return agent.stop() }
+        guard canSend else { return }
+        openRun = nil
+        agent.run(prompt: prompt.trimmingCharacters(in: .whitespacesAndNewlines))
+        prompt = ""
+        composerFocused = false
+    }
+}
+
+/// The drawer behind the chat: past runs, newest first, plus new chat and settings.
+private struct ChatList: View {
+    @ObservedObject var agent: PhoneAgent
+    let width: CGFloat
+    let openRun: RunRecord.ID?
+    let select: (RunRecord.ID?) -> Void
+    let reuse: (String) -> Void
+    let openSettings: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("iPhone Use")
+                .font(.largeTitle.bold())
+                .padding(.horizontal, 20)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(agent.history) { run in
+                        Button { select(run.id) } label: {
+                            Text(run.prompt)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                                .background(
+                                    run.id == openRun ? Color(.secondarySystemFill) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                )
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Use Prompt", systemImage: "arrow.uturn.left") { reuse(run.prompt) }
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                if openRun == run.id { select(nil) }
+                                agent.deleteRun(run.id)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+            .overlay {
+                if agent.history.isEmpty { Text("No chats yet").foregroundStyle(.secondary) }
+            }
+            HStack {
+                Button { select(nil) } label: {
+                    Label("Chat", systemImage: "square.and.pencil")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 14)
+                        .background(Color.accentColor, in: Capsule())
+                }
+                Spacer()
+                Button(action: openSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.title3)
+                        .foregroundStyle(.primary)
+                        .frame(width: 50, height: 50)
+                        .glass(in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Settings")
+            }
+            .padding(.horizontal, 20)
+        }
+        .padding(.vertical, 8)
+        .frame(width: width, alignment: .leading)
+    }
+}
+
+private struct ChatRow: View {
+    let entry: ChatEntry
+
+    var body: some View {
+        switch entry.kind {
+        case .user:
+            Text(entry.text)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color(.secondarySystemFill), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.leading, 48)
+                .textSelection(.enabled)
+        case .assistant:
+            Text(entry.text).textSelection(.enabled)
+        case .step:
+            Text(entry.text)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+    }
+}
+
+/// Typing indicator shown while the agent works.
+private struct PulsingDots: View {
+    @State private var on = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<3) { i in
+                Circle()
+                    .frame(width: 8, height: 8)
+                    .foregroundStyle(.secondary)
+                    .scaleEffect(on ? 1 : 0.5)
+                    .opacity(on ? 1 : 0.3)
+                    .animation(.easeInOut(duration: 0.6).repeatForever().delay(Double(i) * 0.2), value: on)
+            }
+        }
+        .padding(.vertical, 6)
+        .onAppear { on = true }
+    }
+}
+
+private extension View {
+    /// Liquid Glass on iOS 26+, frosted material before. Glass sits behind the
+    /// content so it doesn't wash out solid controls (the black send button).
+    @ViewBuilder func glass(in shape: some Shape) -> some View {
+        if #available(iOS 26, *) {
+            background { Color.clear.glassEffect(.regular, in: shape) }
+        } else {
+            background(.ultraThinMaterial, in: shape)
         }
     }
 }
@@ -97,56 +339,6 @@ private struct ConnectionStatus: View {
         switch connection.step {
         case .idle, .failed: true
         case .working, .ready: false
-        }
-    }
-}
-
-private struct HistoryView: View {
-    @ObservedObject var agent: PhoneAgent
-    let reuse: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List(agent.history) { run in
-                NavigationLink {
-                    ScrollView {
-                        Text(run.log)
-                            .font(.caption.monospaced())
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                            .padding()
-                    }
-                    .navigationTitle(run.date.formatted(date: .abbreviated, time: .shortened))
-                    .toolbar {
-                        Button("Use Prompt") {
-                            reuse(run.prompt)
-                            dismiss()
-                        }
-                    }
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(run.prompt).lineLimit(2)
-                        Text(run.outcome).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                        Text("\(run.date.formatted(date: .abbreviated, time: .shortened)) · \(run.model)")
-                            .font(.caption2).foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            .overlay {
-                if agent.history.isEmpty {
-                    ContentUnavailableView("No runs yet", systemImage: "clock")
-                }
-            }
-            .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("Clear", role: .destructive) { agent.clearHistory() }
-                        .disabled(agent.history.isEmpty)
-                }
-            }
         }
     }
 }

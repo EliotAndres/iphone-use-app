@@ -16,12 +16,7 @@ struct IPhoneUseApp: App {
 
     var body: some Scene {
         WindowGroup {
-            TabView {
-                AgentView()
-                    .tabItem { Label("Agent", systemImage: "sparkles") }
-                SettingsView()
-                    .tabItem { Label("Settings", systemImage: "gearshape") }
-            }
+            AgentView() // Settings opens from its toolbar
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
                 case .background:

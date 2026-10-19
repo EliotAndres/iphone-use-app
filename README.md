@@ -24,10 +24,10 @@ over a CoreDevice tunnel, through a loopback VPN that ships inside the app.
 
 ## First run
 
-1. Settings → Import Pairing File.
+1. Settings (gear, top right) → Import Pairing File.
 2. Allow the "Add VPN Configuration" prompt. The VPN only routes `10.7.0.1` back to the phone.
 3. Settings → Model: pick a provider, paste the API key, pick a model.
-4. Agent tab: wait for "Connected to this iPhone" (the developer disk image downloads on first run), type a prompt, Run.
+4. Back in the chat: wait until the "not connected" line above the input disappears (the developer disk image downloads on first run), then type a prompt and send it.
 
 Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 

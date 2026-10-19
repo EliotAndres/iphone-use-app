@@ -2,16 +2,18 @@
 
 What iphone-use-app does, and what it deliberately leaves out. Decided 2026-10-19.
 
-The app has two tabs, **Agent** and **Settings**. It is minimalist: anything the agent
+The app is one ChatGPT-style **Agent** screen; **Settings** opens from its top-right gear. It is minimalist: anything the agent
 doesn't need stays out, to keep the code and the binary small.
 
 ## Keep / add
 
-### Agent tab
+### Agent screen
+- ChatGPT-style chat: prompt bubble, the agent's reasoning as text, steps in small mono, glass input bar *(new)*
 - Prompt + Run/Stop loop: screenshot → LLM tool call → tap/swipe/type/home/open_app until `done`
 - Live log of each step with timings
 - Connection status line (VPN / tunnel / DDI) *(new)*
-- Run history: past prompts and their results *(new)*
+- Run history: past runs in a chat list that slides in from the left *(new)*
+- Model name in the title; tapping it opens the Settings model picker
 - Installed-app list (name: bundle id) in the system prompt
 - Return to the app when the run is done
 - `agent.log` in Documents
@@ -22,7 +24,7 @@ doesn't need stays out, to keep the code and the binary small.
 - Stop button in the Live Activity *(new)*
 - "Run Agent" Shortcut / Siri intent
 
-### Settings tab
+### Settings
 - LLM *(new; picker modeled on [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent))*:
   - API key, stored in the Keychain (replaces the bundled `openrouter.txt`)
   - Provider: OpenRouter or a custom OpenAI-compatible base URL
@@ -47,7 +49,6 @@ doesn't need stays out, to keep the code and the binary small.
 
 ## Left out
 
-- Model picker inside the Agent tab (it moves to Settings)
 - Target device IP and remote pairing port fields (fixed by the built-in VPN / found by Bonjour)
 - Settings: Download LocalDevVPN link, Discord link, App Folder button, Confirm JIT links,
   Always Run Scripts (TXM override), Malloc debugging
