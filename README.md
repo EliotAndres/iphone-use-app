@@ -23,13 +23,8 @@ types the text and taps Done. Middle: the finished run, each step with its scree
 
 ## Features
 
-- **No computer needed:** the agent runs on the iPhone and controls that same iPhone.
-- **No extra hardware, no jailbreak:** it uses the phone's own developer services, the same ones Xcode uses.
-- **Works across apps:** taps, swipes, types, presses Home and opens any installed app.
-- **Runs in the background:** the Live Activity and Dynamic Island show the current step, with a Stop button.
+- **No computer needed:** the agent runs on the iPhone and controls that same iPhone, no extra hardware or jailbreak
 - **Start it from anywhere:** the chat, Siri, the "Run Agent" Shortcut or an `iphoneuse://run?prompt=…` link.
-- **Bring your own model:** OpenRouter or any compatible endpoint; the key stays in the Keychain.
-- **Free or paid Apple account:** the built-in VPN with a paid team, or the free LocalDevVPN app with a free Apple ID.
 
 ## Requirements
 
