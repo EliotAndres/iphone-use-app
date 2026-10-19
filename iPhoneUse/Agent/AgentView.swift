@@ -207,7 +207,7 @@ struct AgentView: View {
     /// Shows a past run, or for nil the live chat (cleared when nothing is running).
     private func select(_ id: RunRecord.ID?) {
         if id == nil, openRun == nil, !agent.isRunning { agent.entries = [] }
-        openRun = id
+        openRun = id == agent.liveRun?.id ? nil : id // the live run shows as the live chat
         setMenu(false)
     }
 
@@ -366,7 +366,7 @@ private struct ChatList: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 12)
                                 .background(
-                                    run.id == openRun ? Color(.secondarySystemFill) : .clear,
+                                    run.id == (openRun ?? agent.liveRun?.id) ? Color(.secondarySystemFill) : .clear,
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 )
                                 .contentShape(Rectangle())

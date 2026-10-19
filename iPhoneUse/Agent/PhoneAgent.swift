@@ -45,6 +45,8 @@ final class PhoneAgent: ObservableObject {
     @Published private(set) var question: String?
     private var answerWaiter: CheckedContinuation<String, Never>?
     @Published private(set) var history: [RunRecord] = []
+    /// The run in progress, saved to history as it goes so a kill or reinstall mid-run keeps it.
+    @Published private(set) var liveRun: RunRecord?
     private var task: Task<Void, Never>?
     private var activity: Activity<AgentActivityAttributes>?
     private var activityState = AgentActivityAttributes.ContentState(step: 0, line: "Starting", running: true)
@@ -64,7 +66,8 @@ final class PhoneAgent: ObservableObject {
         log = ""
         entries = []
         let settings = LLMSettings.shared
-        let model = settings.model
+        liveRun = RunRecord(date: .now, prompt: prompt, model: settings.model, outcome: "running", log: "", entries: [])
+        saveLiveRun()
         startKeepAlive()
         startActivity(prompt: prompt)
         task = Task { [weak self] in
@@ -85,7 +88,8 @@ final class PhoneAgent: ObservableObject {
                 }
             }
             await say(outcome, as: .assistant, text: outcome.hasPrefix("done: ") ? String(outcome.dropFirst(6)) : outcome)
-            record(RunRecord(date: .now, prompt: prompt, model: model, outcome: outcome, log: log, entries: entries))
+            saveLiveRun(outcome: outcome)
+            liveRun = nil
             // Pop on success, triple "nope" on failure; the user already knows when they hit Stop.
             if !Task.isCancelled { AudioServicesPlaySystemSound(outcome.hasPrefix("done: ") ? 1520 : 1521) }
             stopKeepAlive()
@@ -114,6 +118,7 @@ final class PhoneAgent: ObservableObject {
     }
 
     func deleteRun(_ id: UUID) {
+        guard id != liveRun?.id else { return }
         removeShots(history.filter { $0.id == id })
         history.removeAll { $0.id == id }
         try? JSONEncoder().encode(history).write(to: Self.historyURL, options: .atomic)
@@ -125,10 +130,19 @@ final class PhoneAgent: ObservableObject {
         try? FileManager.default.removeItem(at: Self.historyURL)
     }
 
-    private func record(_ run: RunRecord) {
-        history.insert(run, at: 0)
-        removeShots(Array(history.dropFirst(Self.historyLimit)))
-        history = Array(history.prefix(Self.historyLimit))
+    private func saveLiveRun(outcome: String? = nil) {
+        guard var run = liveRun else { return }
+        if let outcome { run.outcome = outcome }
+        run.log = log
+        run.entries = entries
+        liveRun = run
+        if let i = history.firstIndex(where: { $0.id == run.id }) {
+            history[i] = run
+        } else {
+            history.insert(run, at: 0)
+            removeShots(Array(history.dropFirst(Self.historyLimit)))
+            history = Array(history.prefix(Self.historyLimit))
+        }
         try? JSONEncoder().encode(history).write(to: Self.historyURL, options: .atomic)
     }
 
@@ -279,6 +293,7 @@ final class PhoneAgent: ObservableObject {
             self.log += stamped
             self.entries.append(entry)
             self.updateActivity(line: line, step: step)
+            self.saveLiveRun()
         }
         if let handle = try? FileHandle(forWritingTo: Self.logURL) {
             handle.seekToEndOfFile()
