@@ -44,7 +44,7 @@ types the text and taps Done. Middle: the finished run, each step with its scree
   [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044)), and iOS allows one VPN at a time, so
   Tailscale and similar stop while it is on.
 - **"Viewed remotely from Mac" notice on every run:** iOS shows "Device Hub: This device was viewed remotely from
-  Mac" when its developer services are used, even though the "Mac" here is the app itself. Nothing leaves the phone.
+  Mac" when its developer services are used, even though the "Mac" here is the app itself. Nothing leaves the phone (except calls to LLMs).
 - **Permissions:** requires Developer Mode, a VPN configuration, Local Network access (to find the phone's
   pairing service), and Location set to "Always" (keeps runs alive in the background, alongside silent audio).
   Microphone only for voice prompts.
