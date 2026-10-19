@@ -215,6 +215,50 @@ final class PhoneAgent: ObservableObject {
         }
     }
 
+    #if DEBUG
+    /// `-demoChat YES`: a fake run with placeholder screenshots and a question, to check the
+    /// chat layout on the simulator (no device, no LLM).
+    func runDemo() {
+        isRunning = true
+        entries = [ChatEntry(kind: .user, text: "Order my usual coffee from Starbucks")]
+        let steps = [
+            ("open_app bundle_id=com.starbucks.mystarbucks", "Opening Starbucks directly."),
+            ("tap x=225 y=880", "The Order tab is at the bottom."),
+            ("swipe x1=225 x2=225 y1=700 y2=300", "Scrolling to find recent orders."),
+            ("tap x=120 y=410", "Two recent orders match, I need to know which one."),
+            ("tap x=225 y=620", "Adding the chosen drink to the bag."),
+            ("tap x=380 y=900", "Checking out."),
+        ]
+        task = Task {
+            for (i, step) in steps.enumerated() {
+                try? await Task.sleep(for: .seconds(1.2))
+                if Task.isCancelled { break }
+                await say(step.0, step: i + 1, text: "\(i + 1). \(step.0)", thought: step.1, image: Self.demoShot(i))
+                if i == 3 {
+                    let question = "Your recent orders: Oat Latte (Grande) or Cold Brew (Venti). Which one?"
+                    await say("question", as: .assistant, text: question)
+                    let answer = await waitForAnswer(question)
+                    if Task.isCancelled { break }
+                    await say("answer", as: .user, text: answer)
+                }
+            }
+            if !Task.isCancelled { await say("done", as: .assistant, text: "Ordered, pickup in 8 minutes.") }
+            isRunning = false
+        }
+    }
+
+    private static func demoShot(_ i: Int) -> Data? {
+        let size = CGSize(width: 450, height: 975)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            UIColor(hue: CGFloat(i) * 0.13, saturation: 0.35, brightness: 0.9, alpha: 1).setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            ("\(i + 1)" as NSString).draw(at: CGPoint(x: 160, y: 380), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 160)])
+        }.jpegData(compressionQuality: 0.7)
+    }
+    #endif
+
     private func finishScript() {
         stopKeepAlive()
         isRunning = false

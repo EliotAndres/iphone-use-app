@@ -73,6 +73,9 @@ struct AgentView: View {
             agent.run(prompt: linked)
         }
         .task {
+            #if DEBUG
+            if UserDefaults.standard.bool(forKey: "demoChat") { return agent.runDemo() }
+            #endif
             await connection.connect()
             // Test hooks: `devicectl device process launch ... -agentScript "..."` (no LLM, see
             // scripts/runscript.sh) or `-agentPrompt "..."` (real run).
@@ -106,7 +109,7 @@ struct AgentView: View {
                     ForEach(rows, id: \.first!.id) { row in
                         if row[0].kind == .step { StepCarousel(steps: row) } else { ChatRow(entry: row[0]) }
                     }
-                    if agent.isRunning && openRun == nil { PulsingDots() }
+                    if agent.isRunning && agent.question == nil && openRun == nil { PulsingDots() }
                 }
                 .padding()
             }
