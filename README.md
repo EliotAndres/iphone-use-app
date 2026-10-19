@@ -52,7 +52,7 @@ flowchart LR
 
 | Part | Notes |
 |---|---|
-| **iPhone** | iOS 26 or later, Developer Mode on, Wi-Fi on (the loopback VPN doesn't work cellular-only on recent iOS). |
+| **iPhone** | iOS 26 or later, Developer Mode on. |
 | **Apple account** | **Paid team:** the app uses its own built-in VPN (needs the Network Extension entitlement).<br>**Free Apple ID:** build with `BUILTIN_VPN=NO` (Xcode build setting or `xcodebuild` argument) and install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044); re-sign every 7 days. |
 | **Pairing file** | Made once from a Mac over USB (below). |
 | **Vision model** | An [OpenRouter](https://openrouter.ai/settings/keys) key, or any OpenAI-compatible endpoint whose model takes images and tool calls. |
@@ -137,7 +137,6 @@ Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Limitations
 
-- Needs Wi-Fi: the loopback VPN doesn't connect cellular-only on iOS 26.6+.
 - Requires a loopback VPN (the built-in one, or [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044)),
   so you can't use another VPN while the agent runs: iOS allows one at a time, and Tailscale and similar stop
   while it is on.
