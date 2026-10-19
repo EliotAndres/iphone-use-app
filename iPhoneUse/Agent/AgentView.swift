@@ -49,6 +49,9 @@ struct AgentView: View {
                             }
                     )
             }
+            // Distinct from the chat's systemBackground so the panels separate in dark mode,
+            // where the shadow is invisible.
+            .background(Color(.secondarySystemBackground))
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .task {
@@ -272,7 +275,7 @@ private struct ChatList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("iPhone Use")
+            Text("History")
                 .font(.largeTitle.bold())
                 .padding(.horizontal, 20)
             ScrollView {

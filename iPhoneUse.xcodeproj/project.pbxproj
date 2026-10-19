@@ -382,7 +382,7 @@
 				CODE_SIGN_ENTITLEMENTS = iPhoneUse/iPhoneUse.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iPhoneUse/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "iphone-use-app";
+				INFOPLIST_KEY_CFBundleDisplayName = "iPhone Use";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Keeps the agent running in the background while it uses other apps.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Keeps the agent running in the background while it uses other apps.";
@@ -404,7 +404,7 @@
 				CODE_SIGN_ENTITLEMENTS = iPhoneUse/iPhoneUse.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iPhoneUse/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "iphone-use-app";
+				INFOPLIST_KEY_CFBundleDisplayName = "iPhone Use";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Keeps the agent running in the background while it uses other apps.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Keeps the agent running in the background while it uses other apps.";
