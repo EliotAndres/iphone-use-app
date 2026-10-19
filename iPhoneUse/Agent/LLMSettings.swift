@@ -112,9 +112,18 @@ final class LLMSettings: ObservableObject {
         var request = URLRequest(url: url)
         if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            return (200..<300).contains(status) ? ("Connected.", false) : ("Failed: HTTP \(status).", true)
+            guard (200..<300).contains(status) else { return ("Failed: HTTP \(status).", true) }
+            // OpenRouter's /key: limit_remaining is null when the key has no spending limit.
+            let key = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["data"] as? [String: Any]
+            if let remaining = key?["limit_remaining"] as? Double {
+                return (String(format: "Connected. $%.2f left on this key.", remaining), false)
+            }
+            if let usage = key?["usage"] as? Double {
+                return (String(format: "Connected. $%.2f used, no limit on this key.", usage), false)
+            }
+            return ("Connected.", false)
         } catch {
             return ("Failed: \(error.localizedDescription)", true)
         }
