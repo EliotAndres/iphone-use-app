@@ -18,14 +18,15 @@ struct AgentView: View {
     @FocusState private var composerFocused: Bool
     @State private var openRun: RunRecord.ID? // nil = the live chat
     @State private var menuOpen = false
-    @State private var drag: CGFloat = 0 // swipe-to-close only; opening is the button's job
+    @State private var drag: CGFloat = 0
+    @State private var carousels = CarouselFrames()
     @State private var showSettings = false
     @State private var showShortcutsGuide = false
 
     var body: some View {
         GeometryReader { geo in
             let menuWidth = min(geo.size.width * 0.8, 340)
-            let offset = menuOpen ? max(menuWidth + drag, 0) : 0
+            let offset = min(max((menuOpen ? menuWidth : 0) + drag, 0), menuWidth)
             ZStack(alignment: .leading) {
                 ChatList(agent: agent, width: menuWidth, openRun: openRun, select: select,
                          reuse: { prompt = $0; select(nil) }, needsSetup: needsSetup, openSettings: { showSettings = true },
@@ -43,19 +44,24 @@ struct AgentView: View {
                     .offset(x: offset)
             }
             .simultaneousGesture(
-                DragGesture(minimumDistance: 20)
+                DragGesture(minimumDistance: 20, coordinateSpace: .global)
                     .onChanged { g in
-                        if abs(g.translation.width) > abs(g.translation.height) { drag = min(g.translation.width, 0) }
+                        // A swipe that starts on a step carousel scrolls it, not the drawer.
+                        if !menuOpen, carousels.frames.contains(where: { $0.contains(g.startLocation) }) { return }
+                        if abs(g.translation.width) > abs(g.translation.height) { drag = g.translation.width }
                     }
                     .onEnded { _ in
-                        withAnimation(.snappy) { menuOpen = drag > -80; drag = 0 }
-                    },
-                including: menuOpen ? .all : .subviews
+                        let open = drag > 80 || (menuOpen && drag > -80)
+                        withAnimation(.snappy) { menuOpen = open; drag = 0 }
+                        if open { composerFocused = false }
+                    }
             )
+            .onPreferenceChange(CarouselFramesKey.self) { carousels.frames = $0 }
             // Distinct from the chat's systemBackground so the panels separate in dark mode,
             // where the shadow is invisible.
             .background(Color(.secondarySystemBackground))
         }
+        .onAppear { composerFocused = true } // keyboard up at launch, ready to type
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showShortcutsGuide) {
             NavigationStack {
@@ -171,8 +177,10 @@ struct AgentView: View {
                     prompt = text
                     send()
                 } label: {
-                    Label { Text(text).foregroundStyle(.secondary).multilineTextAlignment(.leading) } icon: {
-                        Image(systemName: icon).foregroundStyle(tint)
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        // Fixed width: the symbols differ in width, the texts should still line up.
+                        Image(systemName: icon).foregroundStyle(tint).frame(width: 24)
+                        Text(text).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                     }
                     .font(.body)
                     .padding(.vertical, 12)
@@ -182,7 +190,7 @@ struct AgentView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 20) // same inset as the status rows below
         .frame(maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 8)
     }
@@ -449,6 +457,15 @@ private struct ChatRow: View {
     }
 }
 
+/// Where the step carousels are on screen, so the drawer swipe can leave them alone.
+/// A class so scrolling (which moves them) doesn't re-render the whole chat.
+private final class CarouselFrames { var frames: [CGRect] = [] }
+
+private struct CarouselFramesKey: PreferenceKey {
+    static var defaultValue: [CGRect] = []
+    static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) { value += nextValue() }
+}
+
 /// A run's steps side by side, newest on the right and kept in view.
 private struct StepCarousel: View {
     let steps: [ChatEntry]
@@ -467,6 +484,7 @@ private struct StepCarousel: View {
                     .padding(.vertical, 4)
                 }
                 .padding(.horizontal, -16) // bleed to the screen edges
+                .background(GeometryReader { Color.clear.preference(key: CarouselFramesKey.self, value: [$0.frame(in: .global)]) })
                 .onAppear { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
                 .onChange(of: steps.count) {
                     withAnimation(.easeOut(duration: 0.4)) { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
@@ -487,39 +505,64 @@ private struct ShotViewer: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        TabView(selection: $selection) {
-            ForEach(shots) { shot in
-                Group {
-                    if let image = UIImage(contentsOfFile: shot.shotURL.path) {
-                        Image(uiImage: image).resizable().scaledToFit()
-                    }
-                }
-                .tag(Optional(shot.id))
-            }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .background(.black)
-        .overlay(alignment: .top) {
-            HStack {
-                let index = shots.firstIndex { $0.id == selection } ?? 0
+        let index = shots.firstIndex { $0.id == selection } ?? 0
+        VStack(spacing: 12) {
+            ZStack {
                 if shots.count <= 20 {
                     HStack(spacing: 6) {
                         ForEach(shots.indices, id: \.self) { i in
-                            Circle().fill(.white.opacity(i == index ? 1 : 0.35)).frame(width: 7, height: 7)
+                            Circle()
+                                .fill(.primary.opacity(i == index ? 1 : 0.25))
+                                .frame(width: 7, height: 7)
                         }
                     }
+                    .animation(.snappy, value: index)
                 } else {
-                    Text("\(index + 1) / \(shots.count)").font(.footnote.monospacedDigit()).foregroundStyle(.white)
+                    Text("\(index + 1) / \(shots.count)").font(.footnote.monospacedDigit().bold())
                 }
-                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .glass(in: Capsule())
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .trailing) {
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark").font(.headline).foregroundStyle(.white).padding(10)
+                    Image(systemName: "xmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .glass(in: Circle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Close")
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
+
+            TabView(selection: $selection) {
+                ForEach(shots) { shot in
+                    VStack(spacing: 14) {
+                        if let image = UIImage(contentsOfFile: shot.shotURL.path) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
+                                .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+                        }
+                        Text(shot.text)
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 8)
+                    .tag(Optional(shot.id))
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
-        .statusBarHidden()
+        .presentationBackground(.ultraThinMaterial) // the chat shows through, blurred
     }
 }
 
