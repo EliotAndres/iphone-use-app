@@ -139,7 +139,7 @@ struct AgentView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.haptic(.borderedProminent))
                         .buttonBorderShape(.capsule)
                         .tint(.red)
                         .padding(.horizontal, 12)
@@ -188,7 +188,7 @@ struct AgentView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.haptic(.plain))
             }
         }
         .padding(.horizontal, 20) // same inset as the status rows below
@@ -379,7 +379,7 @@ private struct ChatList: View {
                                 )
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.haptic(.plain))
                         .contextMenu {
                             Button("Use Prompt", systemImage: "arrow.uturn.left") { reuse(run.prompt) }
                             Button("Delete", systemImage: "trash", role: .destructive) {
@@ -404,7 +404,7 @@ private struct ChatList: View {
                 .padding(.vertical, 12)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.haptic(.plain))
             .padding(.horizontal, 8)
             HStack {
                 Button { select(nil) } label: {
@@ -424,7 +424,7 @@ private struct ChatList: View {
                         .glass(in: Circle())
                         .overlay(alignment: .topTrailing) { if needsSetup { BadgeDot().padding(6) } }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.haptic(.plain))
                 .accessibilityLabel(needsSetup ? "Settings, setup needed" : "Settings")
             }
             .padding(.horizontal, 20)
@@ -535,7 +535,7 @@ private struct ShotViewer: View {
                         .frame(width: 44, height: 44)
                         .glass(in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.haptic(.plain))
                 .accessibilityLabel("Close")
             }
             .padding(.horizontal, 20)
@@ -595,7 +595,7 @@ private struct StepCard: View {
                 .aspectRatio(9 / 19.5, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
-                .onTapGesture(perform: open)
+                .onTapGesture { tapHaptic(); open() }
             }
             Text(entry.text)
                 .font(.caption.monospaced())
@@ -677,11 +677,11 @@ private struct ConnectionStatus: View {
                 // Without a pairing file, connecting fails instantly with the same message: send to Settings instead.
                 if connection.hasPairingFile {
                     Button("Connect") { Task { await connection.connect(force: true) } }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.haptic(.bordered))
                         .controlSize(.small)
                 } else {
                     Button("Set Up", action: openSettings)
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.haptic(.bordered))
                         .controlSize(.small)
                 }
             }

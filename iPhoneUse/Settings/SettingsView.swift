@@ -39,7 +39,7 @@ struct SettingsView: View {
                         CheckRow("Pairing file", detail: hasPairingFile ? "Imported. Tap to replace." : "Tap to import.",
                                  state: hasPairingFile ? .done : .error)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.haptic(.plain))
                     if let pairingMessage {
                         Text(pairingMessage.text)
                             .font(.caption)

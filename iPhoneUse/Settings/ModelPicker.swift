@@ -21,7 +21,7 @@ struct ModelPicker: View {
             }
             .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.haptic(.plain))
         .sheet(isPresented: $showingModels) {
             ModelSelectionView(settings: settings)
         }
@@ -67,7 +67,7 @@ struct ModelSelectionView: View {
                             }
                             .contentShape(.rect)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.haptic(.plain))
                     }
                     if settings.loadingModels {
                         ProgressView("Loading models…")

@@ -17,6 +17,7 @@ struct IPhoneUseApp: App {
     var body: some Scene {
         WindowGroup {
             AgentView() // Settings opens from its toolbar
+            .buttonStyle(.haptic(.automatic))
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
                 case .background:
