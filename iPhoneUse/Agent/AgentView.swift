@@ -95,7 +95,7 @@ struct AgentView: View {
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 8) {
                     if !isConnected {
-                        ConnectionStatus(connection: connection).padding(.horizontal, 20)
+                        ConnectionStatus(connection: connection, openSettings: { showSettings = true }).padding(.horizontal, 20)
                     }
                     if let error = voice.error {
                         Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 20)
@@ -402,6 +402,7 @@ private extension View {
 
 private struct ConnectionStatus: View {
     @ObservedObject var connection: Connection
+    let openSettings: () -> Void
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -421,9 +422,16 @@ private struct ConnectionStatus: View {
             }
             Spacer()
             if showsConnect {
-                Button("Connect") { Task { await connection.connect(force: true) } }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                // Without a pairing file, connecting fails instantly with the same message: send to Settings instead.
+                if connection.hasPairingFile {
+                    Button("Connect") { Task { await connection.connect(force: true) } }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                } else {
+                    Button("Set Up", action: openSettings)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
             }
         }
         .font(.footnote)

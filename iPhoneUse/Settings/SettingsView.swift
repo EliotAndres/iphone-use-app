@@ -224,7 +224,7 @@ private struct ConnectionSettingsView: View {
             Section {
                 CheckRow("Status", detail: connection.step.summary, state: connection.step.checkState)
                 Button("Reconnect") { Task { await connection.connect(force: true) } }
-                    .disabled(connection.step.checkState == .working)
+                    .disabled(connection.step.checkState == .working || !connection.hasPairingFile)
             } footer: {
                 Text("Starts the built-in VPN, connects to this iPhone's developer services and mounts the developer disk image.")
             }
