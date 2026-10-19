@@ -36,8 +36,28 @@ checklist on first launch. (Simulator demo run with placeholder screenshots.)*
 - **Runs in the background:** the Live Activity and Dynamic Island show the current step, with a Stop button.
 - **Start it from anywhere:** the chat, Siri, the "Run Agent" Shortcut or an `iphoneuse://run?prompt=…` link.
 - **Bring your own model:** OpenRouter or any compatible endpoint; the key stays in the Keychain.
-- **Run history:** every run is a chat you can reopen, with each step's screenshot.
 - **Free or paid Apple account:** the built-in VPN with a paid team, or the free LocalDevVPN app with a free Apple ID.
+
+## Requirements
+
+| Part | Notes |
+|---|---|
+| **iPhone** | iOS 26 or later, Developer Mode on. |
+| **Apple account** | **Paid team:** the app uses its own built-in VPN (needs the Network Extension entitlement).<br>**Free Apple ID:** build with `BUILTIN_VPN=NO` (Xcode build setting or `xcodebuild` argument) and install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044); re-sign every 7 days. |
+| **Pairing file** | Made once from a Mac over USB (below). |
+| **Vision model** | An [OpenRouter](https://openrouter.ai/settings/keys) key, or any OpenAI-compatible endpoint whose model takes images and tool calls. |
+| **Mac with Xcode + rustup** | Only to build the app and make the pairing file. Not needed at run time. |
+
+## Limitations
+
+- Requires a convenience shortcut when on cellular: iOS refuses new loopback VPN connections on cellular data,
+  so the app runs a Cellular Toggle shortcut that turns data off while it connects, then back on (or turn it off by hand).
+- Requires a loopback VPN (the built-in one, or [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044)),
+  so you can't use another VPN while the agent runs: iOS allows one at a time, and Tailscale and similar stop
+  while it is on.
+- Pairing files expire; make a new one when the app says so.
+- Sideloaded build only (Developer Mode, developer services): not App Store material.
+- Each step takes a few seconds, most of it the model.
 
 ## How it works
 
@@ -58,16 +78,6 @@ flowchart LR
 - **Brain: the agent loop.** Screenshot → model picks a tool call → act, until `done`. Up to 40 steps by default.
 - **In the background.** The Live Activity shows the current step and has a Stop button.
 - **History.** Every run is a chat in the drawer, with its steps and screenshots.
-
-## Requirements
-
-| Part | Notes |
-|---|---|
-| **iPhone** | iOS 26 or later, Developer Mode on. |
-| **Apple account** | **Paid team:** the app uses its own built-in VPN (needs the Network Extension entitlement).<br>**Free Apple ID:** build with `BUILTIN_VPN=NO` (Xcode build setting or `xcodebuild` argument) and install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044); re-sign every 7 days. |
-| **Pairing file** | Made once from a Mac over USB (below). |
-| **Vision model** | An [OpenRouter](https://openrouter.ai/settings/keys) key, or any OpenAI-compatible endpoint whose model takes images and tool calls. |
-| **Mac with Xcode + rustup** | Only to build the app and make the pairing file. Not needed at run time. |
 
 ## Quick start
 
@@ -134,17 +144,6 @@ The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a
 Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
 </details>
-
-## Limitations
-
-- Requires a convenience shortcut when on cellular: iOS refuses new loopback VPN connections on cellular data,
-  so the app runs a Cellular Toggle shortcut that turns data off while it connects, then back on (or turn it off by hand).
-- Requires a loopback VPN (the built-in one, or [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044)),
-  so you can't use another VPN while the agent runs: iOS allows one at a time, and Tailscale and similar stop
-  while it is on.
-- Pairing files expire; make a new one when the app says so.
-- Sideloaded build only (Developer Mode, developer services): not App Store material.
-- Each step takes a few seconds, most of it the model.
 
 ## Known issues
 
