@@ -503,6 +503,7 @@ private struct ShotViewer: View {
     let shots: [ChatEntry]
     @Binding var selection: ChatEntry.ID?
     @Environment(\.dismiss) private var dismiss
+    @State private var pull: CGFloat = 0 // swipe down to close
 
     var body: some View {
         let index = shots.firstIndex { $0.id == selection } ?? 0
@@ -561,6 +562,18 @@ private struct ShotViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .offset(y: pull)
+            .scaleEffect(1 - min(pull, 300) / 1500)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20)
+                    .onChanged { g in
+                        if g.translation.height > abs(g.translation.width) { pull = g.translation.height }
+                    }
+                    .onEnded { g in
+                        if pull > 120 || g.predictedEndTranslation.height > 400 && pull > 0 { dismiss() }
+                        else { withAnimation(.snappy) { pull = 0 } }
+                    }
+            )
         }
         .presentationBackground(.ultraThinMaterial) // the chat shows through, blurred
     }
