@@ -2,7 +2,7 @@
 //  DeviceSession+Services.swift
 //  iPhoneUse
 //
-//  Calls into idevice over the tunnel. Adapted from StikDebug's IdeviceFFIBridge.
+//  Calls into idevice over the tunnel.
 //
 
 import Foundation

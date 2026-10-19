@@ -29,12 +29,12 @@ over a CoreDevice tunnel, through a loopback VPN that ships inside the app.
 3. Settings → Model: pick a provider, paste the API key, pick a model.
 4. Agent tab: wait for "Connected to this iPhone" (the developer disk image downloads on first run), type a prompt, Run.
 
-Features and what was dropped from StikDebug: [docs/FEATURES.md](docs/FEATURES.md).
+Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Credits
 
-- [StikDebug](https://github.com/StephenDev0/StikDebug) by Stephen and contributors: this app started as a
-  fork of it, and its tunnel, pairing file and developer disk image code lives on here.
+- [StikDebug](https://github.com/StephenDev0/StikDebug) by Stephen and contributors: the tunnel, pairing file
+  and developer disk image code is based on it.
 - [idevice](https://github.com/jkcoxson/idevice) by jkcoxson: the Rust library behind every device call.
 - [LocalDevVPN](https://github.com/jkcoxson/LocalDevVPN) / StosVPN by the SideStore Team and Stossy11:
   the loopback VPN (`TunnelProvider/`) is based on StosVPN.
@@ -44,4 +44,4 @@ Features and what was dropped from StikDebug: [docs/FEATURES.md](docs/FEATURES.m
 
 ## License
 
-AGPL-3.0, inherited from StikDebug. See [`LICENSE`](LICENSE).
+AGPL-3.0. See [`LICENSE`](LICENSE).

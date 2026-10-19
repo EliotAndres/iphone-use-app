@@ -1,9 +1,9 @@
 # Features
 
-What iphone-use-app keeps and what it drops from the StikDebug fork. Decided 2026-10-19.
+What iphone-use-app does, and what it deliberately leaves out. Decided 2026-10-19.
 
 The app has two tabs, **Agent** and **Settings**. It is minimalist: anything the agent
-doesn't need goes, to keep the code and the binary small.
+doesn't need stays out, to keep the code and the binary small.
 
 ## Keep / add
 
@@ -33,7 +33,7 @@ doesn't need goes, to keep the code and the binary small.
 - Redownload DDI button
 - Background keep-alive: silent audio, background location
 - Links: pairing file guide, GitHub repo
-- Credits: StikDebug, idevice, LocalDevVPN/StosVPN, esp32-iphone-agent *(new)*
+- Credits: idevice, LocalDevVPN/StosVPN, esp32-iphone-agent, DeveloperDiskImage
 
 ### Under the hood
 - Built-in loopback VPN, reusing LocalDevVPN's packet tunnel provider, so users don't install
@@ -43,10 +43,9 @@ doesn't need goes, to keep the code and the binary small.
 
 ### Repo + build
 - Slim idevice feature set (45 MB `.a` instead of 74 MB)
-- Rename the Xcode project, target, module and bundle id away from StikDebug
-- README rewritten for the agent app, crediting StikDebug, idevice, LocalDevVPN and esp32-iphone-agent
+- README with credits
 
-## Remove
+## Left out
 
 - Model picker inside the Agent tab (it moves to Settings)
 - Target device IP and remote pairing port fields (fixed by the built-in VPN / found by Bonjour)

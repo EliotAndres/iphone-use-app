@@ -5,7 +5,6 @@ the "Run Agent" Shortcut) and it loops CoreDevice screenshot -> chat completion 
 call -> CoreDevice tap/swipe/type/open-app until done. No Mac or board at run
 time. Background, design notes and gotchas live in Notion: "Controlling iphone".
 
-Started as a fork of [StikDebug](https://github.com/StephenDev0/StikDebug) (remote `upstream`).
 It reaches its own phone's developer services through a loopback VPN (our `TunnelProvider`
 extension, based on LocalDevVPN/StosVPN) + an RP pairing file, using the Rust lib
 [idevice](https://github.com/jkcoxson/idevice). Feature scope: `docs/FEATURES.md`.
@@ -36,7 +35,8 @@ launches the app with `-agentScript`, waits for "script done" in `Documents/agen
 
 ## Decisions
 
-- (2026-10-19) Repo started from the StikDebug fork with its history; `upstream` = StephenDev0/StikDebug. idevice is not vendored: `idevice-patch/` + `scripts/build-idevice.sh` rebuild it from jkcoxson/idevice @ 3854a5d.
-- (2026-10-19) Display name is "iphone-use-app". Project/target/module `iPhoneUse`, bundle id `blog.eliot.iphoneuse` (the pairing file must be re-imported coming from the old `blog.eliot.stikdebug` build).
-- (2026-10-19) App reduced to Agent + Settings tabs (see `docs/FEATURES.md`). The loopback VPN ships in the app; no LocalDevVPN, no target IP / port settings (peer is always `10.7.0.1`, port via Bonjour).
+- (2026-10-19) idevice is not vendored: `idevice-patch/` + `scripts/build-idevice.sh` rebuild it from jkcoxson/idevice @ 3854a5d.
+- (2026-10-19) Display name is "iphone-use-app". Project/target/module `iPhoneUse`, bundle id `blog.eliot.iphoneuse` (re-import the pairing file after a bundle id change).
+- (2026-10-19) Don't describe this repo as a fork of StikDebug; it is credited in the README only.
+- (2026-10-19) Two tabs only, Agent + Settings (see `docs/FEATURES.md`). The loopback VPN ships in the app; no LocalDevVPN, no target IP / port settings (peer is always `10.7.0.1`, port via Bonjour).
 - (2026-10-19) idevice is built with only the features the app calls, and `ring` instead of `aws-lc` (see `scripts/build-idevice.sh`).

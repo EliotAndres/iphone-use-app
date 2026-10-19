@@ -3,8 +3,7 @@
 //  iPhoneUse
 //
 //  Brings up everything the agent needs, in order: loopback VPN -> CoreDevice
-//  tunnel -> developer disk image. Replaces StikDebug's TunnelManager and
-//  MountingProgress, and LocalDevVPN (the VPN now ships in TunnelProvider/).
+//  tunnel -> developer disk image. The VPN ships in TunnelProvider/.
 //
 
 import Foundation

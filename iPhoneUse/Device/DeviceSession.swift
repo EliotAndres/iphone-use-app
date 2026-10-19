@@ -3,8 +3,7 @@
 //  iPhoneUse
 //
 //  The CoreDevice tunnel to this iPhone's own developer services, reached through
-//  the loopback VPN (TunnelProvider) and the imported RP pairing file. Adapted from
-//  StikDebug's JITEnableContext.
+//  the loopback VPN (TunnelProvider) and the imported RP pairing file.
 //
 
 import Foundation
@@ -247,7 +246,7 @@ final class DeviceSession {
     }
 }
 
-/// Heartbeat marco/polo loop on its own tunnel. From StikDebug's DebugHeartbeatKeepAlive.
+/// Heartbeat marco/polo loop on its own tunnel.
 private final class Heartbeat {
     private static let defaultInterval: UInt64 = 2
     private static let maxInterval: UInt64 = 3
