@@ -17,6 +17,17 @@ taps Done, then reports back in the chat. Tap the image for the video (42 s).*
 
 </div>
 
+## Screens
+
+<p align="center">
+  <img src="docs/images/screen-run.jpg" alt="A run in progress: step screenshots, and the agent asking which order" width="30%">
+  <img src="docs/images/screen-done.jpg" alt="The same run finished, with its last steps and summary" width="30%">
+  <img src="docs/images/screen-setup.jpg" alt="Settings: the setup checklist on first launch" width="30%">
+</p>
+
+*Left: a run asks a question when it needs one. Middle: the run done, each step with its screenshot. Right: the setup
+checklist on first launch. (Simulator demo run with placeholder screenshots.)*
+
 ## Features
 
 - **No computer needed:** the agent runs on the iPhone and controls that same iPhone.
