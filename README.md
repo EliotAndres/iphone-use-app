@@ -10,7 +10,9 @@ over a CoreDevice tunnel, through a loopback VPN that ships inside the app.
 ## Requirements
 
 - iOS 17.4+, Developer Mode on, Wi-Fi on
-- A paid Apple developer team (the built-in VPN needs the Network Extension entitlement)
+- A paid Apple developer team for the built-in VPN (it needs the Network Extension entitlement).
+  With a free Apple ID: build with `BUILTIN_VPN=NO` (Xcode build setting or `xcodebuild` argument),
+  install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044) and re-sign the app every 7 days
 - A remote pairing file for the phone (see below)
 - An API key for [OpenRouter](https://openrouter.ai/settings/keys), or any OpenAI-compatible
   endpoint whose model takes images and tool calls
@@ -57,6 +59,7 @@ The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a
 
 1. Settings (gear, top right) → Import Pairing File (skip if you copied it over).
 2. Allow the "Add VPN Configuration" prompt. The VPN only routes `10.7.0.1` back to the phone.
+   With LocalDevVPN instead: turn it on, and pick LocalDevVPN in Settings → Phone connection (picked for you if the built-in VPN fails).
 3. Settings → Model: pick a provider, paste the API key, pick a model.
 4. Back in the chat: wait until the "not connected" line above the input disappears (the developer disk image downloads on first run), then type a prompt and send it.
 

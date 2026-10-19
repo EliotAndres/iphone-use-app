@@ -172,7 +172,7 @@ private extension Connection.Step {
         switch self {
         case .idle: "Not connected"
         case .working(let message): message
-        case .ready: "Connected to this iPhone"
+        case .ready: VPNMode.current == .localDevVPN ? "Connected through LocalDevVPN" : "Connected to this iPhone"
         case .failed(let message): message
         }
     }
@@ -241,6 +241,7 @@ private struct LLMSettingsView: View {
 
 private struct ConnectionSettingsView: View {
     @ObservedObject var connection: Connection
+    @AppStorage(VPNMode.key) private var vpnMode = VPNMode.builtIn
     @State private var showDDIConfirmation = false
     @State private var isRedownloadingDDI = false
     @State private var ddiProgress = 0.0
@@ -250,10 +251,21 @@ private struct ConnectionSettingsView: View {
         Form {
             Section {
                 CheckRow("Status", detail: connection.step.summary, state: connection.step.checkState)
+                Picker("VPN", selection: $vpnMode) {
+                    Text("Built-in").tag(VPNMode.builtIn)
+                    Text("LocalDevVPN").tag(VPNMode.localDevVPN)
+                }
                 Button("Reconnect") { Task { await connection.connect(force: true) } }
                     .disabled(connection.step.checkState == .working || !connection.hasPairingFile)
             } footer: {
-                Text("Starts the built-in VPN, connects to this iPhone's developer services and mounts the developer disk image.")
+                if vpnMode == .builtIn {
+                    Text("Starts the built-in VPN, connects to this iPhone's developer services and mounts the developer disk image.")
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("For builds without the VPN entitlement (free Apple ID). Turn on LocalDevVPN, then Reconnect: it connects to this iPhone's developer services and mounts the developer disk image.")
+                        Link("Get LocalDevVPN", destination: VPNMode.localDevVPNURL)
+                    }
+                }
             }
             Section {
                 Button("Redownload Developer Disk Image") { showDDIConfirmation = true }

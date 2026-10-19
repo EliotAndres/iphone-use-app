@@ -43,6 +43,9 @@ doesn't need stays out, to keep the code and the binary small.
 ### Under the hood
 - Built-in loopback VPN, reusing LocalDevVPN's packet tunnel provider, so users don't install
   LocalDevVPN *(new)*
+- Or the LocalDevVPN app instead, for free Apple IDs that can't sign the Network Extension
+  entitlement: `BUILTIN_VPN=NO` build, VPN picker in Phone Connection, automatic fallback when
+  the built-in VPN is refused *(new)*
 - Auto-mount the developer disk image
 - Heartbeat keep-alive for the CoreDevice tunnel
 
@@ -53,7 +56,7 @@ doesn't need stays out, to keep the code and the binary small.
 ## Left out
 
 - Target device IP and remote pairing port fields (fixed by the built-in VPN / found by Bonjour)
-- Settings: Download LocalDevVPN link, Discord link, App Folder button, Confirm JIT links,
+- Settings: Discord link, App Folder button, Confirm JIT links,
   Always Run Scripts (TXM override), Malloc debugging
 - Apps tab, JIT enabling, LiveContainer flow
 - JS scripts, the script editor, bundled scripts, the CodeEditorView package

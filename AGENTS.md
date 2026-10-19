@@ -27,6 +27,7 @@ rebase onto `main` and fast-forward it (`git -C <main checkout> merge --ff-only 
 
 1. `scripts/build-idevice.sh` (once, or after changing `idevice-patch/`): builds `iPhoneUse/idevice/libidevice_ffi.a`, which is gitignored (45 MB).
 2. `xcodebuild -project iPhoneUse.xcodeproj -scheme iPhoneUse -destination id=<udid> -allowProvisioningUpdates build`, then `xcrun devicectl device install app`.
+   Free Apple ID: add `BUILTIN_VPN=NO` (no Network Extension entitlement) and use LocalDevVPN.
 
 Simulator (UI only, no device): `scripts/build-idevice.sh sim`, then build `-configuration Debug`
 with `LIBRARY_SEARCH_PATHS='$(PROJECT_DIR)/iPhoneUse/idevice/sim'` and launch with `-demoChat YES`
@@ -48,5 +49,6 @@ launches the app with `-agentScript`, waits for "script done" in `Documents/agen
 - (2026-10-19) idevice is not vendored: `idevice-patch/` + `scripts/build-idevice.sh` rebuild it from jkcoxson/idevice @ 3854a5d.
 - (2026-10-19) Display name is "iphone-use-app". Project/target/module `iPhoneUse`, bundle id `blog.eliot.iphoneuse` (re-import the pairing file after a bundle id change).
 - (2026-10-19) Don't describe this repo as a fork of StikDebug; it is credited in the README and the in-app Credits.
-- (2026-10-19) No tab bar: one ChatGPT-style Agent screen, Settings opens from its top-right gear (see `docs/FEATURES.md`). Each run is one chat in the list; runs don't share context with the model. The loopback VPN ships in the app; no LocalDevVPN, no target IP / port settings (peer is always `10.7.0.1`, port via Bonjour).
+- (2026-10-19) No tab bar: one ChatGPT-style Agent screen, Settings opens from its top-right gear (see `docs/FEATURES.md`). Each run is one chat in the list; runs don't share context with the model. The loopback VPN ships in the app (LocalDevVPN optional, see below); no target IP / port settings (peer is always `10.7.0.1`, port via Bonjour).
 - (2026-10-19) idevice is built with only the features the app calls, and `ring` instead of `aws-lc` (see `scripts/build-idevice.sh`).
+- (2026-10-19) Two VPN modes, same peer `10.7.0.1`: Built-in (`TunnelProvider/`, needs the Network Extension entitlement, so a paid team) and LocalDevVPN (the App Store app, for free Apple IDs). Build switch `BUILTIN_VPN` (default YES); `BUILTIN_VPN=NO` signs the app and extension with no entitlements. Runtime picker in Settings → Phone Connection (`vpnMode` in UserDefaults); a NEVPNError from the built-in VPN switches to LocalDevVPN on its own.

@@ -3,7 +3,8 @@
 //  iPhoneUse
 //
 //  Brings up everything the agent needs, in order: loopback VPN -> CoreDevice
-//  tunnel -> developer disk image. The VPN ships in TunnelProvider/.
+//  tunnel -> developer disk image. The VPN ships in TunnelProvider/, or is the
+//  LocalDevVPN app (see VPNMode).
 //
 
 import Foundation
@@ -42,11 +43,26 @@ final class Connection: ObservableObject {
             return
         }
         do {
-            step = .working("Starting VPN…")
-            try await LoopbackVPN.start()
+            var notice = ""
+            if VPNMode.current == .builtIn {
+                step = .working("Starting VPN…")
+                do {
+                    try await LoopbackVPN.start()
+                } catch let error as NSError where error.domain == NEVPNErrorDomain {
+                    // No Network Extension entitlement (BUILTIN_VPN=NO build) or the VPN prompt was refused.
+                    VPNMode.current = .localDevVPN
+                    notice = "Built-in VPN unavailable (\(error.localizedDescription)), switched to LocalDevVPN.\n"
+                }
+            }
 
             step = .working("Connecting to this iPhone…")
-            try await Task.detached(priority: .userInitiated) { try DeviceSession.shared.startTunnel() }.value
+            do {
+                try await Task.detached(priority: .userInitiated) { try DeviceSession.shared.startTunnel() }.value
+            } catch where VPNMode.current == .localDevVPN && (error as NSError).code != -9 {
+                throw NSError(domain: "iPhoneUse", code: -21, userInfo: [
+                    NSLocalizedDescriptionKey: notice + "Can't reach this iPhone. Install LocalDevVPN from the App Store, turn it on, then Reconnect.",
+                ])
+            }
 
             if !DeveloperDiskImageService.filesAreReady {
                 step = .working("Downloading developer disk image…")
@@ -79,6 +95,20 @@ final class Connection: ObservableObject {
                 manifestPath: directory.appendingPathComponent("BuildManifest.plist").path
             )
         }
+    }
+}
+
+/// What routes 10.7.0.1 back to this phone: our TunnelProvider/, or the LocalDevVPN app for
+/// builds that can't sign the Network Extension entitlement (free Apple ID, `BUILTIN_VPN=NO`).
+enum VPNMode: String, CaseIterable {
+    case builtIn, localDevVPN
+
+    static let key = "vpnMode"
+    static let localDevVPNURL = URL(string: "https://apps.apple.com/app/localdevvpn/id6755608044")!
+
+    static var current: VPNMode {
+        get { UserDefaults.standard.string(forKey: key).flatMap(VPNMode.init) ?? .builtIn }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
     }
 }
 
