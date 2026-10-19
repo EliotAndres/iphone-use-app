@@ -81,7 +81,7 @@ struct SettingsView: View {
                     NavigationLink("System Prompt") { SystemPromptEditor(settings: llm) }
                     NavigationLink("Shortcuts & Deep Link") { ShortcutsGuideView() }
                     Button("Clear History", role: .destructive) { showClearHistoryConfirmation = true }
-                        .confirmationDialog("Delete all chats?", isPresented: $showClearHistoryConfirmation, titleVisibility: .visible) {
+                        .confirmationDialog("Delete all sessions?", isPresented: $showClearHistoryConfirmation, titleVisibility: .visible) {
                             Button("Clear History", role: .destructive) { PhoneAgent.shared.clearHistory() }
                         }
                 }
