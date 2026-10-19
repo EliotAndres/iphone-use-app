@@ -169,7 +169,7 @@ struct AgentView: View {
                 TextField("Ask anything", text: $prompt, axis: .vertical)
                     .lineLimit(1...6)
                     .focused($composerFocused)
-                    .padding(.vertical, 10)
+                    .frame(minHeight: 34)
                     .padding(.leading, 6)
             } else {
                 Waveform(levels: voice.levels, transcribing: voice.state == .transcribing)
@@ -188,7 +188,8 @@ struct AgentView: View {
             .accessibilityLabel(agent.isRunning ? "Stop" : "Send")
             .animation(.easeInOut(duration: 0.2), value: agent.isRunning)
         }
-        .padding(6)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 10)
         .padding(.leading, 8)
         .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .onTapGesture { composerFocused = true }
@@ -266,7 +267,7 @@ private struct Waveform: View {
         // Bars sit in an overlay so a full row can't widen the composer.
         Color.clear
             .frame(maxWidth: .infinity)
-            .frame(height: 40)
+            .frame(height: 34)
             .overlay(alignment: .trailing) {
                 HStack(spacing: 2) {
                     ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
