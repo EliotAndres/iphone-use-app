@@ -124,11 +124,22 @@ struct AgentView: View {
             .overlay {
                 if entries.isEmpty { suggestions }
             }
+            // Floats over the chat: it changes size while connecting at launch, and as part of
+            // the bottom inset it made the suggestions jump.
+            .overlay(alignment: .top) {
+                if !isConnected {
+                    ConnectionStatus(connection: connection, openSettings: { showSettings = true })
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 40)
+                        .glass(in: Capsule())
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: connection.step)
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 8) {
-                    if !isConnected {
-                        ConnectionStatus(connection: connection, openSettings: { showSettings = true }).padding(.horizontal, 20)
-                    }
                     if let error = voice.error {
                         Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 20)
                     }
