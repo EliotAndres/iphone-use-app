@@ -9,6 +9,11 @@ It reaches its own phone's developer services through a loopback VPN (our `Tunne
 extension, based on LocalDevVPN/StosVPN) + an RP pairing file, using the Rust lib
 [idevice](https://github.com/jkcoxson/idevice). Feature scope: `docs/FEATURES.md`.
 
+## Git
+
+Always commit on `main`, no feature branches or PRs. From a worktree, commit there, then
+rebase onto `main` and fast-forward it (`git -C <main checkout> merge --ff-only <branch>`).
+
 ## Layout
 
 - `iPhoneUse/Agent/`: the ChatGPT-style chat screen + chat list drawer (`AgentView`), loop + history (`PhoneAgent`), `LLMSettings` (provider, Keychain key, model), `RunAgentIntent`
