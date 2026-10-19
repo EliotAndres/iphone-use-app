@@ -35,6 +35,7 @@ struct AgentView: View {
                 // The mask reaches the screen edges, so the rounded corners follow the
                 // display's instead of clipping the toolbar buttons.
                 chat
+                    .environment(\.carouselFrames, carousels)
                     .background(Color(.systemBackground))
                     .mask { RoundedRectangle(cornerRadius: offset > 0 ? 44 : 0, style: .continuous).ignoresSafeArea() }
                     .shadow(color: .black.opacity(offset > 0 ? 0.15 : 0), radius: 12)
@@ -47,7 +48,7 @@ struct AgentView: View {
                 DragGesture(minimumDistance: 20, coordinateSpace: .global)
                     .onChanged { g in
                         // A swipe that starts on a step carousel scrolls it, not the drawer.
-                        if !menuOpen, carousels.frames.contains(where: { $0.contains(g.startLocation) }) { return }
+                        if !menuOpen, carousels.frames.values.contains(where: { $0.contains(g.startLocation) }) { return }
                         if abs(g.translation.width) > abs(g.translation.height) { drag = g.translation.width }
                     }
                     .onEnded { _ in
@@ -56,7 +57,6 @@ struct AgentView: View {
                         if open { composerFocused = false }
                     }
             )
-            .onPreferenceChange(CarouselFramesKey.self) { carousels.frames = $0 }
             .sensoryFeedback(.impact(weight: .light), trigger: menuOpen)
             // Distinct from the chat's systemBackground so the panels separate in dark mode,
             // where the shadow is invisible.
@@ -471,18 +471,26 @@ private struct ChatRow: View {
 }
 
 /// Where the step carousels are on screen, so the drawer swipe can leave them alone.
-/// A class so scrolling (which moves them) doesn't re-render the whole chat.
-private final class CarouselFrames { var frames: [CGRect] = [] }
+/// A class so scrolling (which moves them) doesn't re-render the whole chat. Carousels write
+/// into it through the environment: a preference wouldn't make it out of the NavigationStack.
+private final class CarouselFrames { var frames: [ChatEntry.ID: CGRect] = [:] }
 
-private struct CarouselFramesKey: PreferenceKey {
-    static var defaultValue: [CGRect] = []
-    static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) { value += nextValue() }
+private struct CarouselFramesEnvironmentKey: EnvironmentKey {
+    static let defaultValue = CarouselFrames()
+}
+
+private extension EnvironmentValues {
+    var carouselFrames: CarouselFrames {
+        get { self[CarouselFramesEnvironmentKey.self] }
+        set { self[CarouselFramesEnvironmentKey.self] = newValue }
+    }
 }
 
 /// A run's steps side by side, newest on the right and kept in view.
 private struct StepCarousel: View {
     let steps: [ChatEntry]
     @State private var viewing: ChatEntry.ID?
+    @Environment(\.carouselFrames) private var carousels
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -497,7 +505,8 @@ private struct StepCarousel: View {
                     .padding(.vertical, 4)
                 }
                 .padding(.horizontal, -16) // bleed to the screen edges
-                .background(GeometryReader { Color.clear.preference(key: CarouselFramesKey.self, value: [$0.frame(in: .global)]) })
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { carousels.frames[steps[0].id] = $0 }
+                .onDisappear { carousels.frames[steps[0].id] = nil }
                 .onAppear { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
                 .onChange(of: steps.count) {
                     withAnimation(.easeOut(duration: 0.4)) { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
