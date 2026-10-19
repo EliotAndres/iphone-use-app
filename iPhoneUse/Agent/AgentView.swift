@@ -663,9 +663,44 @@ private extension View {
     }
 }
 
+/// iOS refuses new connections to this iPhone over cellular data; see Connection.blockedByCellular.
+private struct CellularHelpView: View {
+    let connect: (_ withShortcut: Bool) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("iOS blocks connecting to this iPhone over cellular data. Join a Wi-Fi network, or turn cellular data off while connecting: once connected, it can go back on.")
+                }
+                Section("Option 1") {
+                    Text("Turn off Cellular Data in Control Center, then:")
+                    Button("Connect") { connect(false) }
+                }
+                Section {
+                    Link(destination: CellularShortcut.installURL) {
+                        Label("Install Cellular Toggle Shortcut", systemImage: "square.and.arrow.down")
+                    }
+                    Button("Connect with Shortcut") { connect(true) }
+                } header: {
+                    Text("Option 2")
+                } footer: {
+                    Text("Add the shortcut once. The app then turns cellular data off and back on by itself while connecting.")
+                }
+            }
+            .navigationTitle("On Cellular")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { Button("Close") { dismiss() } }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 private struct ConnectionStatus: View {
     @ObservedObject var connection: Connection
     let openSettings: () -> Void
+    @State private var showCellularHelp = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -687,7 +722,7 @@ private struct ConnectionStatus: View {
             if showsConnect {
                 // Without a pairing file, connecting fails instantly with the same message: send to Settings instead.
                 if connection.hasPairingFile {
-                    Button("Connect") { Task { await connection.connect(force: true) } }
+                    Button("Connect") { connect() }
                         .buttonStyle(.haptic(.bordered))
                         .controlSize(.small)
                 } else {
@@ -698,6 +733,21 @@ private struct ConnectionStatus: View {
             }
         }
         .font(.footnote)
+        .sheet(isPresented: $showCellularHelp) {
+            CellularHelpView { withShortcut in
+                connection.usesCellularShortcut = withShortcut
+                showCellularHelp = false
+                connect()
+            }
+        }
+    }
+
+    /// Opens the cellular help sheet when the attempt fails on cellular data.
+    private func connect() {
+        Task {
+            await connection.connect(force: true)
+            showCellularHelp = connection.blockedByCellular
+        }
     }
 
     private var showsConnect: Bool {

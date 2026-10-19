@@ -8,7 +8,9 @@
 //
 
 import Foundation
+import Network
 import NetworkExtension
+import UIKit
 
 @MainActor
 final class Connection: ObservableObject {
@@ -22,6 +24,13 @@ final class Connection: ObservableObject {
     }
 
     @Published private(set) var step: Step = .idle
+    /// The last attempt failed because iOS refuses new connections to the VPN peer while
+    /// cellular data is on and no Wi-Fi network is joined (LocalDevVPN issue #31).
+    @Published private(set) var blockedByCellular = false
+    /// Set by the sheet's "Connect with Shortcut": run CellularShortcut around new tunnels.
+    @Published var usesCellularShortcut = UserDefaults.standard.bool(forKey: "usesCellularShortcut") {
+        didSet { UserDefaults.standard.set(usesCellularShortcut, forKey: "usesCellularShortcut") }
+    }
     private var connecting: Task<Void, Never>?
 
     var isReady: Bool { step == .ready }
@@ -42,6 +51,7 @@ final class Connection: ObservableObject {
             step = .failed("Import a pairing file in Settings.")
             return
         }
+        blockedByCellular = false
         do {
             var notice = ""
             if VPNMode.current == .builtIn {
@@ -56,12 +66,36 @@ final class Connection: ObservableObject {
             }
 
             step = .working("Connecting to this iPhone…")
-            do {
-                try await Task.detached(priority: .userInitiated) { try DeviceSession.shared.startTunnel() }.value
-            } catch where VPNMode.current == .localDevVPN && (error as NSError).code != -9 {
-                throw NSError(domain: "iPhoneUse", code: -21, userInfo: [
-                    NSLocalizedDescriptionKey: notice + "Can't reach this iPhone. Install LocalDevVPN from the App Store, turn it on, then Reconnect.",
-                ])
+            // Keep a tunnel that still answers: on cellular only, iOS refuses new
+            // connections to the VPN peer but leaves established ones alone.
+            let alive = await Task.detached(priority: .userInitiated) {
+                let device = DeviceSession.shared
+                return device.adapterHandle != nil && (try? device.isDeveloperDiskImageMounted()) != nil
+            }.value
+            if !alive {
+                let cellularOnly = await CellularShortcut.isCellularOnly()
+                if cellularOnly {
+                    guard usesCellularShortcut else {
+                        step = .failed("On cellular data: turn it off to connect, or join Wi-Fi.")
+                        blockedByCellular = true
+                        return
+                    }
+                    step = .working("Turning cellular data off…")
+                    guard await CellularShortcut.turnOff() else {
+                        step = .failed("Cellular data is still on. Is the shortcut installed?")
+                        blockedByCellular = true
+                        return
+                    }
+                    step = .working("Connecting to this iPhone…")
+                }
+                defer { if cellularOnly { CellularShortcut.turnOn() } }
+                do {
+                    try await Task.detached(priority: .userInitiated) { try DeviceSession.shared.startTunnel() }.value
+                } catch where VPNMode.current == .localDevVPN && (error as NSError).code != -9 {
+                    throw NSError(domain: "iPhoneUse", code: -21, userInfo: [
+                        NSLocalizedDescriptionKey: notice + "Can't reach this iPhone. Install LocalDevVPN from the App Store, turn it on, then Reconnect.",
+                    ])
+                }
             }
 
             if !DeveloperDiskImageService.filesAreReady {
@@ -147,5 +181,60 @@ enum LoopbackVPN {
             try await manager.loadFromPreferences()
         }
         return manager
+    }
+}
+
+/// Runs the "iPhone Use Cellular" shortcut, which sets Cellular Data to its input ("on",
+/// anything else = off), the way SideStore's Cellular Refresh does. x-success brings the app back.
+enum CellularShortcut {
+    static let name = "iPhone Use Cellular"
+    static let installURL = URL(string: "https://www.icloud.com/shortcuts/26b48e4bbcc34caea4b4e64c8759ab35")!
+
+    /// True when traffic goes over cellular data with no Wi-Fi network joined.
+    static func isCellularOnly() async -> Bool {
+        let path = await currentPath()
+        return path.status == .satisfied && path.usesInterfaceType(.cellular) && !path.usesInterfaceType(.wifi)
+    }
+
+    /// Runs the shortcut with "off", then waits up to 20 s for cellular data to go away.
+    @MainActor
+    static func turnOff() async -> Bool {
+        run("off")
+        for _ in 0..<40 {
+            try? await Task.sleep(for: .milliseconds(500))
+            if !(await isCellularOnly()) {
+                try? await Task.sleep(for: .seconds(1)) // ponytail: fixed settle time, as SideStore does
+                return true
+            }
+        }
+        return false
+    }
+
+    @MainActor
+    static func turnOn() { run("on") }
+
+    @MainActor
+    private static func run(_ input: String) {
+        var components = URLComponents(string: "shortcuts://x-callback-url/run-shortcut")!
+        components.queryItems = [
+            URLQueryItem(name: "name", value: name),
+            URLQueryItem(name: "input", value: "text"),
+            URLQueryItem(name: "text", value: input),
+            URLQueryItem(name: "x-success", value: "iphoneuse://"),
+            URLQueryItem(name: "x-error", value: "iphoneuse://"),
+        ]
+        UIApplication.shared.open(components.url!)
+    }
+
+    private static func currentPath() async -> Network.NWPath {
+        await withCheckedContinuation { continuation in
+            let monitor = NWPathMonitor()
+            monitor.pathUpdateHandler = { path in
+                monitor.pathUpdateHandler = nil
+                monitor.cancel()
+                continuation.resume(returning: path)
+            }
+            monitor.start(queue: .global(qos: .userInitiated))
+        }
     }
 }
