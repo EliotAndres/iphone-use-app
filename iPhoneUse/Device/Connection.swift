@@ -27,26 +27,28 @@ final class Connection: ObservableObject {
     /// The last attempt failed because iOS refuses new connections to the VPN peer while
     /// cellular data is on and no Wi-Fi network is joined (LocalDevVPN issue #31).
     @Published private(set) var blockedByCellular = false
-    /// Set by the sheet's "Connect with Shortcut": run CellularShortcut around new tunnels.
-    @Published var usesCellularShortcut = UserDefaults.standard.bool(forKey: "usesCellularShortcut") {
-        didSet { UserDefaults.standard.set(usesCellularShortcut, forKey: "usesCellularShortcut") }
+    /// CellularShortcut worked last time: automatic reconnects may run it too, not only a tap on Connect.
+    private var usesCellularShortcut: Bool {
+        get { UserDefaults.standard.bool(forKey: "usesCellularShortcut") }
+        set { UserDefaults.standard.set(newValue, forKey: "usesCellularShortcut") }
     }
     private var connecting: Task<Void, Never>?
 
     var isReady: Bool { step == .ready }
     var hasPairingFile: Bool { FileManager.default.fileExists(atPath: PairingFileStore.prepareURL().path) }
 
-    /// Connects if needed; concurrent callers share one attempt.
-    func connect(force: Bool = false) async {
+    /// Connects if needed; concurrent callers share one attempt. `userInitiated` (a tap on
+    /// Connect) tries CellularShortcut on cellular data even if it never worked before.
+    func connect(force: Bool = false, userInitiated: Bool = false) async {
         if isReady && !force { return }
         if let connecting { return await connecting.value }
-        let task = Task { await run() }
+        let task = Task { await run(userInitiated: userInitiated) }
         connecting = task
         await task.value
         connecting = nil
     }
 
-    private func run() async {
+    private func run(userInitiated: Bool) async {
         guard hasPairingFile else {
             step = .failed("Import a pairing file in Settings.")
             return
@@ -75,14 +77,14 @@ final class Connection: ObservableObject {
             if !alive {
                 let cellularOnly = await CellularShortcut.isCellularOnly()
                 if cellularOnly {
-                    guard usesCellularShortcut else {
-                        step = .failed("On cellular data: turn it off to connect, or join Wi-Fi.")
-                        blockedByCellular = true
-                        return
+                    var turnedOff = false
+                    if usesCellularShortcut || userInitiated {
+                        step = .working("Turning cellular data off…")
+                        turnedOff = await CellularShortcut.turnOff()
+                        usesCellularShortcut = turnedOff
                     }
-                    step = .working("Turning cellular data off…")
-                    guard await CellularShortcut.turnOff() else {
-                        step = .failed("Cellular data is still on. Is the shortcut installed?")
+                    guard turnedOff else {
+                        step = .failed("On cellular data: turn it off to connect, or join Wi-Fi.")
                         blockedByCellular = true
                         return
                     }
@@ -184,49 +186,82 @@ enum LoopbackVPN {
     }
 }
 
-/// Runs the "iPhone Use Cellular" shortcut, which sets Cellular Data to its input ("on",
-/// anything else = off), the way SideStore's Cellular Refresh does. x-success brings the app back.
+/// Runs the "[iPhone Use] Toggle Cellular" shortcut: "If Shortcut Input has any value, Set Cellular Data
+/// On, Otherwise Off" (iOS only offers "has any value" there), the way SideStore's Cellular Refresh does. Shortcuts' x-callback-url
+/// opens iphoneuse://shortcut/done (or /failed) when it ends, which brings the app back.
+@MainActor
 enum CellularShortcut {
-    static let name = "iPhone Use Cellular"
-    static let installURL = URL(string: "https://www.icloud.com/shortcuts/26b48e4bbcc34caea4b4e64c8759ab35")!
+    static let name = "[iPhone Use] Toggle Cellular"
+    static let installURL = URL(string: "https://www.icloud.com/shortcuts/3b7bbc4cd1f243968423cfb0e40ed5b6")!
+
+    private static var callback: (id: UUID, continuation: CheckedContinuation<Bool, Never>)?
 
     /// True when traffic goes over cellular data with no Wi-Fi network joined.
-    static func isCellularOnly() async -> Bool {
+    nonisolated static func isCellularOnly() async -> Bool {
         let path = await currentPath()
+        appLog.notice("Cellular check: \(String(describing: path), privacy: .public)")
         return path.status == .satisfied && path.usesInterfaceType(.cellular) && !path.usesInterfaceType(.wifi)
     }
 
-    /// Runs the shortcut with "off", then waits up to 20 s for cellular data to go away.
-    @MainActor
+    /// Runs the shortcut with "off", then waits up to 5 s for cellular data to go away.
     static func turnOff() async -> Bool {
-        run("off")
-        for _ in 0..<40 {
-            try? await Task.sleep(for: .milliseconds(500))
+        guard await run(input: nil) else { return false }
+        for _ in 0..<10 {
             if !(await isCellularOnly()) {
                 try? await Task.sleep(for: .seconds(1)) // ponytail: fixed settle time, as SideStore does
                 return true
             }
+            try? await Task.sleep(for: .milliseconds(500))
         }
         return false
     }
 
-    @MainActor
-    static func turnOn() { run("on") }
+    static func turnOn() { Task { await run(input: "on") } }
 
-    @MainActor
-    private static func run(_ input: String) {
-        var components = URLComponents(string: "shortcuts://x-callback-url/run-shortcut")!
-        components.queryItems = [
-            URLQueryItem(name: "name", value: name),
-            URLQueryItem(name: "input", value: "text"),
-            URLQueryItem(name: "text", value: input),
-            URLQueryItem(name: "x-success", value: "iphoneuse://"),
-            URLQueryItem(name: "x-error", value: "iphoneuse://"),
-        ]
-        UIApplication.shared.open(components.url!)
+    /// Handles Shortcuts' callback URL; false for any other link.
+    static func handle(_ url: URL) -> Bool {
+        guard url.scheme == "iphoneuse", url.host() == "shortcut" else { return false }
+        appLog.notice("Shortcut callback: \(url.absoluteString, privacy: .public)")
+        finish(url.path() == "/done")
+        return true
     }
 
-    private static func currentPath() async -> Network.NWPath {
+    /// True once Shortcuts reports the run succeeded; false on error, cancel, or no callback in 30 s.
+    private static func run(input: String?) async -> Bool {
+        finish(false) // an earlier run that never called back
+        var components = URLComponents(string: "shortcuts://x-callback-url/run-shortcut")!
+        components.queryItems = [URLQueryItem(name: "name", value: name)]
+        if let input {
+            components.queryItems! += [URLQueryItem(name: "input", value: "text"), URLQueryItem(name: "text", value: input)]
+        }
+        components.queryItems! += [
+            URLQueryItem(name: "x-success", value: "iphoneuse://shortcut/done"),
+            URLQueryItem(name: "x-error", value: "iphoneuse://shortcut/failed"),
+            URLQueryItem(name: "x-cancel", value: "iphoneuse://shortcut/failed"),
+        ]
+        let url = components.url!
+        let id = UUID()
+        appLog.notice("Running shortcut: \(url.absoluteString, privacy: .public)")
+        return await withCheckedContinuation { continuation in
+            callback = (id, continuation)
+            UIApplication.shared.open(url) { opened in
+                if !opened { finish(false, id: id) }
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(30))
+                finish(false, id: id)
+            }
+        }
+    }
+
+    /// Resumes the pending run; with `id`, only if it is still that run.
+    private static func finish(_ succeeded: Bool, id: UUID? = nil) {
+        guard let pending = callback, id == nil || id == pending.id else { return }
+        callback = nil
+        pending.continuation.resume(returning: succeeded)
+    }
+
+    nonisolated private static func currentPath() async -> Network.NWPath {
         await withCheckedContinuation { continuation in
             let monitor = NWPathMonitor()
             monitor.pathUpdateHandler = { path in

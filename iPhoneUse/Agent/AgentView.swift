@@ -71,6 +71,7 @@ struct AgentView: View {
         }
         // iphoneuse://run?prompt=... starts a new session, like the Run Agent intent.
         .onOpenURL { url in
+            if CellularShortcut.handle(url) { return }
             guard let linked = DeepLink.prompt(from: url), !agent.isRunning else { return }
             showSettings = false
             showShortcutsGuide = false
@@ -665,7 +666,7 @@ private extension View {
 
 /// iOS refuses new connections to this iPhone over cellular data; see Connection.blockedByCellular.
 private struct CellularHelpView: View {
-    let connect: (_ withShortcut: Bool) -> Void
+    let connect: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -676,13 +677,13 @@ private struct CellularHelpView: View {
                 }
                 Section("Option 1") {
                     Text("Turn off Cellular Data in Control Center, then:")
-                    Button("Connect") { connect(false) }
+                    Button("Connect") { connect() }
                 }
                 Section {
                     Link(destination: CellularShortcut.installURL) {
                         Label("Install Cellular Toggle Shortcut", systemImage: "square.and.arrow.down")
                     }
-                    Button("Connect with Shortcut") { connect(true) }
+                    Button("Connect") { connect() }
                 } header: {
                     Text("Option 2")
                 } footer: {
@@ -734,8 +735,7 @@ private struct ConnectionStatus: View {
         }
         .font(.footnote)
         .sheet(isPresented: $showCellularHelp) {
-            CellularHelpView { withShortcut in
-                connection.usesCellularShortcut = withShortcut
+            CellularHelpView {
                 showCellularHelp = false
                 connect()
             }
@@ -745,7 +745,7 @@ private struct ConnectionStatus: View {
     /// Opens the cellular help sheet when the attempt fails on cellular data.
     private func connect() {
         Task {
-            await connection.connect(force: true)
+            await connection.connect(force: true, userInitiated: true)
             showCellularHelp = connection.blockedByCellular
         }
     }
