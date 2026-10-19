@@ -95,3 +95,12 @@ iOSInjectionProject/
 .DS_Store
 .vscode/settings.json
 .vscode 
+
+## iphone-use-app
+# OpenRouter key, bundled into the app at build time. Never commit.
+StikDebug/Agent/openrouter.txt
+# 200 MB, built by scripts/build-idevice.sh
+StikDebug/idevice/libidevice_ffi.a
+.build/
+scripts/*.png
+scripts/agent.log

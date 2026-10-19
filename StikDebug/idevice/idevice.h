@@ -3045,6 +3045,54 @@ void icon_service_free_icon(struct AppIconC *icon);
 void icon_service_free(struct IconServiceHandle *handle);
 
 /**
+ * Captures the main display. `jpeg` != 0 asks for JPEG instead of PNG.
+ * Free `out_data` with `idevice_data_free(out_data, out_len)`.
+ *
+ * # Safety
+ * All pointers must be valid; handles must come from this library.
+ */
+struct IdeviceFfiError *probe_screenshot(struct AdapterHandle *adapter,
+                                         struct RsdHandshakeHandle *handshake,
+                                         uint8_t jpeg,
+                                         uint8_t **out_data,
+                                         uintptr_t *out_len);
+
+/**
+ * Touch drag from (x1, y1) to (x2, y2), normalized 0..65535. Equal points = a tap.
+ *
+ * # Safety
+ * Handles must be valid and come from this library.
+ */
+struct IdeviceFfiError *probe_touch(struct AdapterHandle *adapter,
+                                    struct RsdHandshakeHandle *handshake,
+                                    uint16_t x1,
+                                    uint16_t y1,
+                                    uint16_t x2,
+                                    uint16_t y2);
+
+/**
+ * Presses a hardware button (HID usage page/code, e.g. home = 0x0C/0x40) for `hold_ms`.
+ *
+ * # Safety
+ * Handles must be valid and come from this library.
+ */
+struct IdeviceFfiError *probe_button(struct AdapterHandle *adapter,
+                                     struct RsdHandshakeHandle *handshake,
+                                     uint64_t usage_page,
+                                     uint64_t usage_code,
+                                     uint64_t hold_ms);
+
+/**
+ * Types ASCII `text` on the focused field (US layout); other characters are skipped.
+ *
+ * # Safety
+ * Handles must be valid and come from this library; `text` a valid C string.
+ */
+struct IdeviceFfiError *probe_type(struct AdapterHandle *adapter,
+                                   struct RsdHandshakeHandle *handshake,
+                                   const char *text);
+
+/**
  * Automatically creates and connects to Core Device Proxy, returning a client handle
  *
  * # Arguments
@@ -5130,6 +5178,10 @@ struct IdeviceFfiError *house_arrest_client_new(struct IdeviceHandle *socket,
 /**
  * Vends a container for an app
  *
+ * If any argument is null, the client is not consumed. Otherwise, this function
+ * consumes the client on both success and error, including device errors.
+ * The caller must not use or free the consumed client afterwards.
+ *
  * # Arguments
  * * [`client`] - The House Arrest client
  * * [`bundle_id`] - The bundle ID to vend for
@@ -5139,7 +5191,7 @@ struct IdeviceFfiError *house_arrest_client_new(struct IdeviceHandle *socket,
  * An IdeviceFfiError on error, null on success
  *
  * # Safety
- * `client` must be a allocated by this library
+ * `client` must be a valid pointer to a handle allocated by this library
  * `bundle_id` must be a NULL-terminated string
  * `afc_client` must be a valid, non-null pointer where the new AFC client will be stored
  */
@@ -5150,6 +5202,10 @@ struct IdeviceFfiError *house_arrest_vend_container(struct HouseArrestClientHand
 /**
  * Vends documents for an app
  *
+ * If any argument is null, the client is not consumed. Otherwise, this function
+ * consumes the client on both success and error, including device errors.
+ * The caller must not use or free the consumed client afterwards.
+ *
  * # Arguments
  * * [`client`] - The House Arrest client
  * * [`bundle_id`] - The bundle ID to vend for
@@ -5159,7 +5215,7 @@ struct IdeviceFfiError *house_arrest_vend_container(struct HouseArrestClientHand
  * An IdeviceFfiError on error, null on success
  *
  * # Safety
- * `client` must be a allocated by this library
+ * `client` must be a valid pointer to a handle allocated by this library
  * `bundle_id` must be a NULL-terminated string
  * `afc_client` must be a valid, non-null pointer where the new AFC client will be stored
  */
@@ -5596,6 +5652,9 @@ void lockdown_location_simulation_free(struct LocationSimulationServiceHandle *h
 /**
  * Connects to lockdownd service using provider
  *
+ * The caller retains ownership of `provider` on both success and failure and
+ * must free it with `idevice_provider_free` when it is no longer needed.
+ *
  * # Arguments
  * * [`provider`] - An IdeviceProvider
  * * [`client`] - On success, will be set to point to a newly allocated LockdowndClient handle
@@ -5914,6 +5973,9 @@ void misagent_client_free(struct MisagentClientHandle *handle);
 /**
  * Connects to the Image Mounter service using a provider
  *
+ * The caller retains ownership of `provider` on both success and failure and
+ * must free it with `idevice_provider_free` when it is no longer needed.
+ *
  * # Arguments
  * * [`provider`] - An IdeviceProvider
  * * [`client`] - On success, will be set to point to a newly allocated ImageMounter handle
@@ -6061,6 +6123,8 @@ struct IdeviceFfiError *image_mounter_upload_image(struct ImageMounterHandle *cl
  * # Safety
  * All pointers must be valid (except optional ones which can be null)
  * `image_type` must be a valid null-terminated C string
+ * `info_plist` must be a valid plist or NULL. It is borrowed, not consumed,
+ * on both success and failure. Ownership of the original plist is unchanged.
  */
 struct IdeviceFfiError *image_mounter_mount_image(struct ImageMounterHandle *client,
                                                   const char *image_type,
@@ -6239,6 +6303,8 @@ struct IdeviceFfiError *image_mounter_roll_cryptex_nonce(struct ImageMounterHand
  *
  * # Safety
  * All pointers must be valid (except optional ones which can be null)
+ * `info_plist` must be a valid plist or NULL. It is borrowed, not consumed,
+ * on both success and failure. Ownership of the original plist is unchanged.
  */
 struct IdeviceFfiError *image_mounter_mount_personalized(struct ImageMounterHandle *client,
                                                          struct IdeviceProviderHandle *provider,
@@ -6272,6 +6338,8 @@ struct IdeviceFfiError *image_mounter_mount_personalized(struct ImageMounterHand
  *
  * # Safety
  * All pointers must be valid (except optional ones which can be null)
+ * `info_plist` must be a valid plist or NULL. It is borrowed, not consumed,
+ * on both success and failure. Ownership of the original plist is unchanged.
  */
 struct IdeviceFfiError *image_mounter_mount_personalized_rsd(struct ImageMounterHandle *client,
                                                              struct AdapterHandle *provider,
@@ -6308,6 +6376,8 @@ struct IdeviceFfiError *image_mounter_mount_personalized_rsd(struct ImageMounter
  *
  * # Safety
  * All pointers must be valid (except optional ones which can be null)
+ * `info_plist` must be a valid plist or NULL. It is borrowed, not consumed,
+ * on both success and failure. Ownership of the original plist is unchanged.
  */
 struct IdeviceFfiError *image_mounter_mount_personalized_with_callback_rsd(struct ImageMounterHandle *client,
                                                                            struct AdapterHandle *provider,
@@ -6347,6 +6417,8 @@ struct IdeviceFfiError *image_mounter_mount_personalized_with_callback_rsd(struc
  *
  * # Safety
  * All pointers must be valid (except optional ones which can be null)
+ * `info_plist` must be a valid plist or NULL. It is borrowed, not consumed,
+ * on both success and failure. Ownership of the original plist is unchanged.
  */
 struct IdeviceFfiError *image_mounter_mount_personalized_with_callback(struct ImageMounterHandle *client,
                                                                        struct IdeviceProviderHandle *provider,
@@ -6816,6 +6888,9 @@ void remote_notification_proxy_free(struct RemoteNotificationProxyClientHandle *
 
 /**
  * Connects to the relay with the given provider
+ *
+ * The caller retains ownership of `provider` on both success and failure and
+ * must free it with `idevice_provider_free` when it is no longer needed.
  *
  * # Arguments
  * * [`provider`] - A provider created by this library
@@ -8547,6 +8622,9 @@ void screenshotr_client_free(struct ScreenshotrClientHandle *handle);
 /**
  * Connects to the Springboard service using a provider
  *
+ * The caller retains ownership of `provider` on both success and failure and
+ * must free it with `idevice_provider_free` when it is no longer needed.
+ *
  * # Arguments
  * * [`provider`] - An IdeviceProvider
  * * [`client`] - On success, will be set to point to a newly allocated SpringBoardServicesClient handle
@@ -8705,6 +8783,9 @@ void springboard_services_free(struct SpringBoardServicesClientHandle *handle);
 
 /**
  * Automatically creates and connects to syslog relay, returning a client handle
+ *
+ * The caller retains ownership of `provider` on both success and failure and
+ * must free it with `idevice_provider_free` when it is no longer needed.
  *
  * # Arguments
  * * [`provider`] - An IdeviceProvider
@@ -9096,7 +9177,7 @@ void idevice_usbmuxd_listener_handle_free(struct UsbmuxdListenerHandle *stream_h
 struct IdeviceFfiError *idevice_usbmuxd_listener_next(struct UsbmuxdListenerHandle *stream_handle,
                                                       bool *connect,
                                                       struct UsbmuxdDeviceHandle **connection_device,
-                                                      uint32_t *disconnection_id);
+                                                      uint64_t *disconnection_id);
 
 /**
  * Reads the BUID (Boot-Unique ID) from usbmuxd.

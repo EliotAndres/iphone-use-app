@@ -890,3 +890,64 @@ func clear_simulated_location() -> Int32 {
 
     return LocationSimulationStatus.ok
 }
+
+// MARK: - Agent: CoreDevice screenshot / HID / launch on this same phone
+
+extension JITEnableContext {
+    func agentScreenshot(jpeg: Bool = true) throws -> Data {
+        try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
+            var bytes: UnsafeMutablePointer<UInt8>?
+            var length = UInt(0)
+            if let ffiError = probe_screenshot(adapter, handshake, jpeg ? 1 : 0, &bytes, &length) {
+                throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Screenshot failed", domain: "agent")
+            }
+            guard let bytes else { throw IdeviceBridge.makeError(domain: "agent", message: "Empty screenshot") }
+            defer { idevice_data_free(bytes, length) }
+            return Data(bytes: bytes, count: Int(length))
+        }
+    }
+
+    /// Normalized 0...1 coordinates; equal start and end points tap.
+    func agentTouch(from: CGPoint, to: CGPoint) throws {
+        func scale(_ v: CGFloat) -> UInt16 { UInt16(max(0, min(1, v)) * 65535) }
+        try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
+            if let ffiError = probe_touch(adapter, handshake, scale(from.x), scale(from.y), scale(to.x), scale(to.y)) {
+                throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Touch failed", domain: "agent")
+            }
+        }
+    }
+
+    func agentHome() throws {
+        try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
+            if let ffiError = probe_button(adapter, handshake, 0x0C, 0x40, 80) {
+                throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Home failed", domain: "agent")
+            }
+        }
+    }
+
+    func agentType(_ text: String) throws {
+        try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
+            if let ffiError = probe_type(adapter, handshake, text) {
+                throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Typing failed", domain: "agent")
+            }
+        }
+    }
+
+    func agentLaunch(bundleID: String) throws {
+        try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
+            try IdeviceBridge.withConnectedClient(
+                fallback: "Unable to open AppService",
+                missingClientMessage: "AppService client was not created",
+                connect: { app_service_connect_rsd(adapter, handshake, $0) },
+                cleanup: { app_service_free($0) }
+            ) { appService in
+                var response: UnsafeMutablePointer<LaunchResponseC>?
+                let ffiError = app_service_launch_app(appService, bundleID, nil, 0, 0, 0, nil, &response)
+                if let response { app_service_free_launch_response(response) }
+                if let ffiError {
+                    throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Failed to launch \(bundleID)", domain: "agent")
+                }
+            }
+        }
+    }
+}

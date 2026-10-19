@@ -21,6 +21,8 @@
 		<string>_stikdebug._tcp</string>
 		<string>_stikdebug._udp</string>
 	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

@@ -70,7 +70,7 @@ struct MainTabView: View {
             .onAppear {
                 ensureSelectionIsValid()
                 if !didSetInitialHome {
-                    selection = AppFeature.home.id
+                    selection = AppFeature.agent.id
                     didSetInitialHome = true
                 }
             }
@@ -120,7 +120,7 @@ struct MainTabView: View {
         if ids.contains(selection) {
             return
         }
-        selection = AppFeature.home.id
+        selection = AppFeature.agent.id
     }
 
     private func handleURL(_ url: URL) {

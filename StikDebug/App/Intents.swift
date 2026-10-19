@@ -264,6 +264,15 @@ struct KillProcessIntent: AppIntent {
 struct StikDebugShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
+            intent: RunAgentIntent(),
+            phrases: [
+                "Run \(.applicationName) agent",
+                "Ask \(.applicationName)"
+            ],
+            shortTitle: "Run Agent",
+            systemImageName: "sparkles"
+        )
+        AppShortcut(
             intent: EnableJITIntent(),
             phrases: [
                 "Enable JIT for \(\.$app) with \(.applicationName)",

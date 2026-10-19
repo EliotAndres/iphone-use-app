@@ -6,6 +6,7 @@
 import SwiftUI
 
 enum AppFeature: String, CaseIterable, Identifiable {
+    case agent
     case home
     case scripts
     case tools
@@ -22,6 +23,8 @@ enum AppFeature: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .agent:
+            return "Agent"
         case .home:
             return "Apps"
         case .scripts:
@@ -45,6 +48,8 @@ enum AppFeature: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
+        case .agent:
+            return "Let an LLM drive this phone"
         case .home:
             return "Manage installed apps"
         case .scripts:
@@ -77,6 +82,8 @@ enum AppFeature: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .agent:
+            return "sparkles"
         case .home:
             return "square.grid.2x2"
         case .scripts:
@@ -101,6 +108,8 @@ enum AppFeature: String, CaseIterable, Identifiable {
     @ViewBuilder
     var destination: some View {
         switch self {
+        case .agent:
+            AgentView()
         case .home:
             HomeView()
         case .scripts:
@@ -124,6 +133,6 @@ enum AppFeature: String, CaseIterable, Identifiable {
 }
 
 extension AppFeature {
-    static let mainTabs: [AppFeature] = [.home, .tools, .settings]
+    static let mainTabs: [AppFeature] = [.agent, .home, .tools, .settings]
     static let toolList: [AppFeature] = [.scripts, .console, .deviceInfo, .profiles, .processes, .location]
 }
