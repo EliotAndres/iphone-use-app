@@ -62,10 +62,10 @@ The simulator can't reach a device, but it shows the UI. `-demoChat YES` plays a
 
 Feature scope: [docs/FEATURES.md](docs/FEATURES.md).
 
-## Known technical issues
-
 <details>
-<summary>Heartbeat connection closes right after connecting (fixed: runs used to get killed)</summary>
+<summary><h2>Known technical issues</h2></summary>
+
+### Heartbeat connection closes right after connecting (fixed: runs used to get killed)
 
 **Symptom (before the fix):** a run froze on a step after about a minute in the background, and the
 Live Activity stayed on that step. The app had been killed: the phone's crash logs held an
