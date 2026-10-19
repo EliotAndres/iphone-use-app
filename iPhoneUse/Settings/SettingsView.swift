@@ -44,11 +44,30 @@ struct SettingsView: View {
                     if llm.provider == .openRouter {
                         Link("Get an OpenRouter key", destination: Links.openRouterKeys)
                     } else {
-                        Text("Any OpenAI-compatible endpoint with vision and tool calls.")
+                        Text("Any OpenAI-compatible endpoint with vision and tool calls. Voice input won't work: it needs OpenRouter.")
                     }
                 }
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+
+                Section {
+                    Picker("Model", selection: $llm.voiceModel) {
+                        ForEach(Set(LLMSettings.voiceModels + [llm.voiceModel]).sorted(), id: \.self) { Text($0).tag($0) }
+                    }
+                    Picker("Language", selection: $llm.voiceLanguage) {
+                        Text("Auto-detect").tag("")
+                        ForEach(LLMSettings.voiceLanguages, id: \.self) {
+                            Text(Locale.current.localizedString(forLanguageCode: $0) ?? $0).tag($0)
+                        }
+                    }
+                } header: {
+                    Text("Voice")
+                } footer: {
+                    Text(llm.provider == .openRouter
+                         ? "Transcribed by OpenRouter with your API key. Setting the language is faster and more accurate than auto-detect."
+                         : "Voice input only works with the OpenRouter provider.")
+                }
+                .disabled(llm.provider != .openRouter)
 
                 Section("Agent") {
                     Stepper("Max steps: \(llm.maxSteps)", value: $llm.maxSteps, in: 5...200, step: 5)

@@ -13,6 +13,7 @@ struct AgentView: View {
     @ObservedObject private var agent = PhoneAgent.shared
     @ObservedObject private var connection = Connection.shared
     @ObservedObject private var llm = LLMSettings.shared
+    @ObservedObject private var voice = VoiceRecorder.shared
     @State private var prompt = ""
     @FocusState private var composerFocused: Bool
     @State private var openRun: RunRecord.ID? // nil = the live chat
@@ -93,6 +94,9 @@ struct AgentView: View {
                     if !isConnected {
                         ConnectionStatus(connection: connection).padding(.horizontal, 20)
                     }
+                    if let error = voice.error {
+                        Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 20)
+                    }
                     composer
                 }
             }
@@ -139,15 +143,24 @@ struct AgentView: View {
         setMenu(false)
     }
 
-    private var canSend: Bool { !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSend: Bool {
+        voice.state == .recording || voice.state == .idle && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Ask anything", text: $prompt, axis: .vertical)
-                .lineLimit(1...6)
-                .focused($composerFocused)
-                .padding(.vertical, 10)
-                .padding(.leading, 6)
+            if voice.state == .idle {
+                TextField("Ask anything", text: $prompt, axis: .vertical)
+                    .lineLimit(1...6)
+                    .focused($composerFocused)
+                    .padding(.vertical, 10)
+                    .padding(.leading, 6)
+            } else {
+                Waveform(levels: voice.levels, transcribing: voice.state == .transcribing)
+            }
+            if !agent.isRunning {
+                MicButton(voice: voice, enabled: llm.voiceAvailable) { finishVoice(send: false) }
+            }
             Button(action: sendOrStop) {
                 Image(systemName: agent.isRunning ? "stop.fill" : "arrow.up")
                     .font(.system(size: 15, weight: .bold))
@@ -171,11 +184,81 @@ struct AgentView: View {
     // Every run starts fresh for the model, so sending always opens the live chat.
     private func sendOrStop() {
         if agent.isRunning { return agent.stop() }
+        if voice.state == .recording { return finishVoice(send: true) }
         guard canSend else { return }
         openRun = nil
         agent.run(prompt: prompt.trimmingCharacters(in: .whitespacesAndNewlines))
         prompt = ""
         composerFocused = false
+    }
+
+    private func finishVoice(send: Bool) {
+        composerFocused = false
+        Task {
+            guard let text = await voice.finish(), !text.isEmpty else { return }
+            prompt = prompt.isEmpty ? text : prompt + " " + text
+            if send { sendOrStop() }
+        }
+    }
+}
+
+/// Tap to start (it becomes a stop button), or hold and release.
+private struct MicButton: View {
+    @ObservedObject var voice: VoiceRecorder
+    let enabled: Bool
+    let stop: () -> Void
+    @State private var pressStart: Date?
+    @State private var startedByPress = false
+
+    var body: some View {
+        Image(systemName: voice.state == .recording ? "stop.fill" : "mic")
+            .font(.system(size: voice.state == .recording ? 13 : 17, weight: .semibold))
+            .foregroundStyle(enabled && voice.state != .transcribing ? Color.primary : .secondary)
+            .frame(width: 34, height: 34)
+            .background(Circle().fill(voice.state == .recording ? Color(.secondarySystemFill) : .clear))
+            .contentShape(Circle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard enabled, pressStart == nil else { return }
+                    pressStart = .now
+                    startedByPress = voice.state == .idle
+                    if startedByPress { Task { await voice.start() } }
+                }
+                .onEnded { _ in
+                    guard let start = pressStart else { return }
+                    pressStart = nil
+                    let held = Date.now.timeIntervalSince(start) > 0.4
+                    if voice.state == .recording, !startedByPress || held { stop() }
+                })
+            .accessibilityLabel(voice.state == .recording ? "Stop recording" : "Record voice prompt")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                if voice.state == .recording { stop() } else if enabled { Task { await voice.start() } }
+            }
+    }
+}
+
+/// Live input levels in place of the text field while recording, newest on the right.
+private struct Waveform: View {
+    let levels: [Float]
+    let transcribing: Bool
+
+    var body: some View {
+        // Bars sit in an overlay so a full row can't widen the composer.
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .overlay(alignment: .trailing) {
+                HStack(spacing: 2) {
+                    ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
+                        Capsule().frame(width: 3, height: 3 + CGFloat(level) * 24)
+                    }
+                }
+                .foregroundStyle(transcribing ? .tertiary : .primary)
+            }
+            .clipped()
+            .overlay { if transcribing { ProgressView() } }
+            .animation(.linear(duration: 0.08), value: levels)
     }
 }
 

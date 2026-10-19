@@ -29,6 +29,15 @@ final class LLMSettings: ObservableObject {
     static let shared = LLMSettings()
     static let openRouterURL = "https://openrouter.ai/api/v1"
     static let defaultModel = "anthropic/claude-sonnet-5.5"
+    /// Fast OpenRouter transcription models, first is the default.
+    static let voiceModels = [
+        "openai/whisper-large-v3-turbo",
+        "nvidia/parakeet-tdt-0.6b-v3",
+        "openai/gpt-4o-mini-transcribe",
+        "mistralai/voxtral-mini-transcribe",
+        "elevenlabs/scribe-v2",
+    ]
+    static let voiceLanguages = ["en", "fr", "es", "de", "it", "pt", "nl", "ja", "zh", "ko", "hi", "ar", "ru"]
     static let defaultSystemPrompt = """
     You operate an iPhone on behalf of its owner. Every step you get a fresh screenshot and \
     must call exactly one tool. Coordinates are pixels in that screenshot (origin top-left). \
@@ -51,6 +60,9 @@ final class LLMSettings: ObservableObject {
     @Published var maxSteps: Int { didSet { defaults.set(maxSteps, forKey: "agentMaxSteps") } }
     @Published var systemPrompt: String { didSet { defaults.set(systemPrompt, forKey: "agentSystemPrompt") } }
     @Published var apiKey: String { didSet { Keychain.set(apiKey, for: keychainAccount) } }
+    @Published var voiceModel: String { didSet { defaults.set(voiceModel, forKey: "voiceModel") } }
+    /// ISO-639-1 code; empty means auto-detect.
+    @Published var voiceLanguage: String { didSet { defaults.set(voiceLanguage, forKey: "voiceLanguage") } }
 
     @Published private(set) var models: [String] = []
     @Published private(set) var loadingModels = false
@@ -66,6 +78,8 @@ final class LLMSettings: ObservableObject {
         maxSteps = defaults.object(forKey: "agentMaxSteps") as? Int ?? 40
         systemPrompt = defaults.string(forKey: "agentSystemPrompt") ?? Self.defaultSystemPrompt
         apiKey = Keychain.get("apiKey.\(provider.rawValue)") ?? ""
+        voiceModel = defaults.string(forKey: "voiceModel") ?? Self.voiceModels[0]
+        voiceLanguage = defaults.string(forKey: "voiceLanguage") ?? ""
     }
 
     var baseURL: String {
@@ -80,6 +94,9 @@ final class LLMSettings: ObservableObject {
         if model.trimmingCharacters(in: .whitespaces).isEmpty { return "Pick a model in Settings." }
         return nil
     }
+
+    /// Voice uses OpenRouter's transcription endpoint, so it needs the OpenRouter provider.
+    var voiceAvailable: Bool { provider == .openRouter && !apiKey.isEmpty }
 
     var config: LLMConfig? {
         guard problem == nil, let url = URL(string: baseURL + "/chat/completions") else { return nil }

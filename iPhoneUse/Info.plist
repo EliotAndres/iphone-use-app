@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Records voice prompts for the agent.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Finds this iPhone's Remote Pairing service so the agent can control it.</string>
 	<key>NSBonjourServices</key>
