@@ -9,7 +9,7 @@ doesn't need stays out, to keep the code and the binary small.
 
 ### Agent screen
 - ChatGPT-style chat: prompt bubble, the agent's reasoning as text, steps in small mono, glass input bar *(new)*
-- Prompt + Run/Stop loop: screenshot → LLM tool call → tap/swipe/type/home/open_app until `done`
+- Prompt + Run/Stop loop: screenshot → LLM tool call → tap/long_press/swipe/type/home/open_app until `done`
 - Live log of each step with timings
 - Connection status line (VPN / tunnel / DDI) *(new)*
 - Run history: past runs in a chat list that slides in from the left *(new)*

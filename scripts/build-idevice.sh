@@ -15,8 +15,8 @@ if [ ! -d "$SRC" ]; then
   git clone https://github.com/jkcoxson/idevice.git "$SRC"
   git -C "$SRC" checkout -q $COMMIT
   git -C "$SRC" apply "$ROOT/idevice-patch/idevice.patch"
-  cp "$ROOT/idevice-patch/probe.rs" "$SRC/ffi/src/core_device/probe.rs"
 fi
+cp "$ROOT/idevice-patch/probe.rs" "$SRC/ffi/src/core_device/probe.rs" # every run, so probe.rs edits land
 
 cd "$SRC"
 export PATH="$(dirname "$(rustup which cargo)"):$PATH"

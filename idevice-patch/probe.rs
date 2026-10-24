@@ -53,7 +53,8 @@ pub unsafe extern "C" fn probe_screenshot(
     }
 }
 
-/// Touch drag from (x1, y1) to (x2, y2), normalized 0..65535. Equal points = a tap.
+/// Touch drag from (x1, y1) to (x2, y2), normalized 0..65535. Equal points = a tap,
+/// held for `hold_ms` (a long press when ~800). A drag first holds still for `hold_ms`.
 ///
 /// # Safety
 /// Handles must be valid and come from this library.
@@ -65,6 +66,7 @@ pub unsafe extern "C" fn probe_touch(
     y1: u16,
     x2: u16,
     y2: u16,
+    hold_ms: u64,
 ) -> *mut IdeviceFfiError {
     if adapter.is_null() || handshake.is_null() {
         return ffi_err!(IdeviceError::FfiInvalidArg);
@@ -78,10 +80,14 @@ pub unsafe extern "C" fn probe_touch(
         let ts = || Some(unsafe { libc::mach_absolute_time() });
         if (x1, y1) == (x2, y2) {
             hid.send_touchscreen(TOUCH_CONTACT, x1, y1, ts()).await?;
-            tokio::time::sleep(Duration::from_millis(60)).await;
+            tokio::time::sleep(Duration::from_millis(hold_ms.max(60))).await;
             hid.send_touchscreen(TOUCH_RELEASE, x1, y1, ts()).await?;
             hid.send_touchscreen(TOUCH_RELEASE, x1, y1, ts()).await?;
         } else {
+            if hold_ms > 0 {
+                hid.send_touchscreen(TOUCH_CONTACT, x1, y1, ts()).await?;
+                tokio::time::sleep(Duration::from_millis(hold_ms)).await;
+            }
             for i in 0..=30u32 {
                 let t = i as f64 / 30.0;
                 let x = (x1 as f64 + (x2 as f64 - x1 as f64) * t).round() as u16;

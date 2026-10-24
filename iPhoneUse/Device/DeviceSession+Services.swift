@@ -358,11 +358,11 @@ extension DeviceSession {
         }
     }
 
-    /// Normalized 0...1 coordinates; equal start and end points tap.
-    func agentTouch(from: CGPoint, to: CGPoint) throws {
+    /// Normalized 0...1 coordinates; equal start and end points tap, held for `holdMs`.
+    func agentTouch(from: CGPoint, to: CGPoint, holdMs: UInt64 = 0) throws {
         func scale(_ v: CGFloat) -> UInt16 { UInt16(max(0, min(1, v)) * 65535) }
         try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
-            if let ffiError = probe_touch(adapter, handshake, scale(from.x), scale(from.y), scale(to.x), scale(to.y)) {
+            if let ffiError = probe_touch(adapter, handshake, scale(from.x), scale(from.y), scale(to.x), scale(to.y), holdMs) {
                 throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Touch failed", domain: "agent")
             }
         }

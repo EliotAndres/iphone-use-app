@@ -211,6 +211,7 @@ final class PhoneAgent: ObservableObject {
                     case "open": try device.agentLaunch(bundleID: line[1])
                     case "tap": try device.agentTouch(from: CGPoint(x: n[0], y: n[1]), to: CGPoint(x: n[0], y: n[1]))
                     case "swipe": try device.agentTouch(from: CGPoint(x: n[0], y: n[1]), to: CGPoint(x: n[2], y: n[3]))
+                    case "press": try device.agentTouch(from: CGPoint(x: n[0], y: n[1]), to: CGPoint(x: n[0], y: n[1]), holdMs: 800)
                     case "type": try device.agentType(line.dropFirst().joined(separator: " "))
                     case "home": try device.agentHome()
                     case "wait": try? await Task.sleep(for: .seconds(n[0]))
@@ -399,6 +400,9 @@ final class PhoneAgent: ObservableObject {
         case "tap":
             let p = point("x", "y")
             try device.agentTouch(from: p, to: p)
+        case "long_press":
+            let p = point("x", "y")
+            try device.agentTouch(from: p, to: p, holdMs: 800)
         case "swipe":
             try device.agentTouch(from: point("x1", "y1"), to: point("x2", "y2"))
         case "type":
@@ -499,6 +503,7 @@ final class PhoneAgent: ObservableObject {
         }
         return [
             tool("tap", "Tap a point.", ["x": "x pixel", "y": "y pixel"]),
+            tool("long_press", "Touch and hold a point, e.g. for a context menu.", ["x": "x pixel", "y": "y pixel"]),
             tool("swipe", "Drag from (x1,y1) to (x2,y2); swipe up to scroll down.",
                  ["x1": "start x", "y1": "start y", "x2": "end x", "y2": "end y"]),
             tool("type", "Type text into the focused field.", ["text": "text to type"], ["text": "string"]),

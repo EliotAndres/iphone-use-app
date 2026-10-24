@@ -68,7 +68,7 @@ flowchart LR
 ```
 
 The app mounts a developer image, then uses a loopback VPN to screenshot and control the iPhone it runs on.
-Each step, the screenshot goes to the model, which answers with a tool call (tap, swipe, type, open app) until it's done.
+Each step, the screenshot goes to the model, which answers with a tool call (tap, long press, swipe, type, open app) until it's done.
 A Live Activity shows progress with a Stop button, and every run is saved as a chat.
 
 ## Quick start

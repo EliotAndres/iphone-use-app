@@ -3058,7 +3058,8 @@ struct IdeviceFfiError *probe_screenshot(struct AdapterHandle *adapter,
                                          uintptr_t *out_len);
 
 /**
- * Touch drag from (x1, y1) to (x2, y2), normalized 0..65535. Equal points = a tap.
+ * Touch drag from (x1, y1) to (x2, y2), normalized 0..65535. Equal points = a tap,
+ * held for `hold_ms` (a long press when ~800). A drag first holds still for `hold_ms`.
  *
  * # Safety
  * Handles must be valid and come from this library.
@@ -3068,7 +3069,8 @@ struct IdeviceFfiError *probe_touch(struct AdapterHandle *adapter,
                                     uint16_t x1,
                                     uint16_t y1,
                                     uint16_t x2,
-                                    uint16_t y2);
+                                    uint16_t y2,
+                                    uint64_t hold_ms);
 
 /**
  * Presses a hardware button (HID usage page/code, e.g. home = 0x0C/0x40) for `hold_ms`.
