@@ -9,13 +9,19 @@
 import AVFoundation
 
 @MainActor
+final class LevelMeter: ObservableObject {
+    /// Recent input levels, 0...1, newest last.
+    @Published var levels: [Float] = []
+}
+
+@MainActor
 final class VoiceRecorder: ObservableObject {
     static let shared = VoiceRecorder()
 
     enum State { case idle, recording, transcribing }
     @Published private(set) var state = State.idle
-    /// Recent input levels, 0...1, newest last.
-    @Published private(set) var levels: [Float] = []
+    /// Input levels live apart from `state` so only the waveform redraws on each audio chunk.
+    let meter = LevelMeter()
     @Published private(set) var error: String?
 
     static let levelCount = 60
@@ -43,13 +49,13 @@ final class VoiceRecorder: ObservableObject {
             try session.setActive(true)
             engine = AVAudioEngine()
             pcm = Data()
-            levels = []
+            meter.levels = []
             try Self.installTap(on: engine.inputNode) { [weak self] chunk, level in
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
                         guard let self, self.state == .recording else { return }
                         self.pcm.append(chunk)
-                        self.levels = (self.levels + [level]).suffix(Self.levelCount)
+                        self.meter.levels = (self.meter.levels + [level]).suffix(Self.levelCount)
                     }
                 }
             }

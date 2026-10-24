@@ -247,10 +247,10 @@ struct AgentView: View {
                     .frame(minHeight: 34)
                     .padding(.leading, 6)
             } else {
-                Waveform(levels: voice.levels, transcribing: voice.state == .transcribing)
+                Waveform(meter: voice.meter, transcribing: voice.state == .transcribing)
             }
             if composerEnabled {
-                MicButton(voice: voice, enabled: llm.voiceAvailable) { finishVoice(send: false) }
+                MicButton(voice: voice, enabled: llm.voiceAvailable) { finishVoice(send: $0) }
             }
             Button(action: send) {
                 Image(systemName: "arrow.up")
@@ -300,11 +300,11 @@ struct AgentView: View {
     }
 }
 
-/// Tap to start (it becomes a stop button), or hold and release.
+/// Tap to start (it becomes a stop button), or hold and release to send once transcribed.
 private struct MicButton: View {
     @ObservedObject var voice: VoiceRecorder
     let enabled: Bool
-    let stop: () -> Void
+    let stop: (_ send: Bool) -> Void
     @State private var pressStart: Date?
     @State private var startedByPress = false
 
@@ -326,19 +326,19 @@ private struct MicButton: View {
                     guard let start = pressStart else { return }
                     pressStart = nil
                     let held = Date.now.timeIntervalSince(start) > 0.4
-                    if voice.state == .recording, !startedByPress || held { stop() }
+                    if voice.state == .recording, !startedByPress || held { stop(startedByPress && held) }
                 })
             .accessibilityLabel(voice.state == .recording ? "Stop recording" : "Record voice prompt")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction {
-                if voice.state == .recording { stop() } else if enabled { Task { await voice.start() } }
+                if voice.state == .recording { stop(false) } else if enabled { Task { await voice.start() } }
             }
     }
 }
 
 /// Live input levels in place of the text field while recording, newest on the right.
 private struct Waveform: View {
-    let levels: [Float]
+    @ObservedObject var meter: LevelMeter
     let transcribing: Bool
 
     var body: some View {
@@ -347,8 +347,10 @@ private struct Waveform: View {
             .frame(maxWidth: .infinity)
             .frame(height: 34)
             .overlay(alignment: .trailing) {
+                // Always a full row (silent dots first), so bars never shift sideways as it fills.
+                let row = Array(repeating: 0, count: max(0, VoiceRecorder.levelCount - meter.levels.count)) + meter.levels
                 HStack(spacing: 2) {
-                    ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, level in
                         Capsule().frame(width: 3, height: 3 + CGFloat(level) * 24)
                     }
                 }
@@ -356,7 +358,7 @@ private struct Waveform: View {
             }
             .clipped()
             .overlay { if transcribing { ProgressView() } }
-            .animation(.linear(duration: 0.08), value: levels)
+            .animation(.linear(duration: 0.08), value: meter.levels)
     }
 }
 
