@@ -35,7 +35,8 @@ struct ModelSelectionView: View {
     @State private var customID = ""
 
     private var matches: [String] {
-        Set(settings.models + [settings.model]).filter {
+        // Jev isn't in /models (it only serves the decisions endpoint), so list it by hand.
+        Set(settings.models + [settings.model, Jev.model]).filter {
             !$0.isEmpty && (search.isEmpty || $0.localizedStandardContains(search))
         }.sorted()
     }

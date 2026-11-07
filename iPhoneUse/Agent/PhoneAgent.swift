@@ -342,7 +342,9 @@ final class PhoneAgent: ObservableObject {
 
             let reply: [String: Any]
             do {
-                reply = try await Self.complete(messages: messages, config: config)
+                reply = try await Jev.handles(config.model)
+                    ? Jev.decide(task: prompt, messages: messages, image: image, apps: apps, config: config)
+                    : Self.complete(messages: messages, config: config)
             } catch {
                 if Task.isCancelled { return "stopped" }
                 return "error: LLM: \(error.localizedDescription)"
