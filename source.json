@@ -25,7 +25,7 @@
           "date": "2026-11-08",
           "localizedDescription": "First release. Free Apple ID build: uses LocalDevVPN instead of the built-in VPN.",
           "downloadURL": "https://github.com/EliotAndres/iphone-use-app/releases/download/v0.1/iphone-use-app.ipa",
-          "size": 10907914,
+          "size": 10914170,
           "minOSVersion": "17.4"
         }
       ],
