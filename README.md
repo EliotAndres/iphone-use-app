@@ -27,6 +27,17 @@ types the destination, picks it and stops at the ride options. Middle: the finis
   A Mac is only needed once, to make the pairing file
 - **Start it from anywhere:** the chat, Siri, the "Run Agent" Shortcut or an `iphoneuse://run?prompt=…` link.
 
+## How it compares
+
+| | iphone-use-app | [TapKit](https://tapkit.ai) | [esp32-iphone-agent](https://github.com/onehumanbeing/esp32-iphone-agent) | [iPhone-use](https://github.com/zhongerxin/iPhone-use) |
+|---|---|---|---|---|
+| **Computer at run time** | None (a Mac once, for pairing) | Mac app, phone plugged in | None (a computer once, to flash the board) | Mac (MCP server) |
+| **Extra hardware** | None | None | ESP32-S3 board (~$7) on USB-C | None |
+| **How it sees and acts** | CoreDevice screenshots and touches, through a loopback VPN | Apple accessibility features | AirPlay mirroring to the board, USB mouse/keyboard via AssistiveTouch | WebDriverAgent (XCTest) over USB |
+| **Works away from a desk** | Yes | No | Yes, with the board plugged in | No |
+| **Price / license** | Free, AGPL-3.0 (bring a model key) | $49/month per phone | Free, MIT (firmware GPL-3.0) | Free, MIT |
+| **iOS** | 26+ | n/a | 18+ | What your Xcode supports |
+
 ## Requirements
 
 | Part | Notes |
@@ -35,7 +46,7 @@ types the destination, picks it and stops at the ride options. Middle: the finis
 | **Apple account** | **Paid team:** the app uses its own built-in VPN (needs the Network Extension entitlement).<br>**Free Apple ID:** build with `BUILTIN_VPN=NO` (Xcode build setting or `xcodebuild` argument) and install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044); re-sign every 7 days. |
 | **Pairing file** | Made once from a Mac over USB (below). |
 | **Vision model** | An [OpenRouter](https://openrouter.ai/settings/keys) key, or any OpenAI-compatible endpoint whose model takes images and tool calls. |
-| **Mac with Xcode + rustup** | Only to build the app and make the pairing file. Not needed at run time. |
+| **Mac** | Only to make the pairing file (and to build the app, unless you install the release). Not needed at run time. |
 
 ## Limitations
 
@@ -90,10 +101,20 @@ cargo build --release -p idevice-tools --bin idevice-tools
 The file keeps working until the phone stops trusting that host (Reset Location & Privacy, Developer Mode turned off).
 Make a new one if the app says the pairing file is invalid or expired.
 
-### 2. Build and install the app
+### 2. Install the app
+
+**Without building:** add this source in [SideStore](https://sidestore.io) or [AltStore](https://altstore.io):
+`https://raw.githubusercontent.com/EliotAndres/iphone-use-app/main/source.json`
+(or sideload the `.ipa` from [Releases](https://github.com/EliotAndres/iphone-use-app/releases/latest)).
+It is the free Apple ID build: install [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044) too.
+
+**From source** (needed for the built-in VPN, which takes a paid team):
 
 ```sh
-scripts/build-idevice.sh        # once: builds iPhoneUse/idevice/libidevice_ffi.a (needs the aarch64-apple-ios target)
+# once: the prebuilt Rust lib (45 MB, gitignored) from the latest release...
+curl -L -o iPhoneUse/idevice/libidevice_ffi.a https://github.com/EliotAndres/iphone-use-app/releases/latest/download/libidevice_ffi.a
+# ...or build it yourself (needs rustup + the aarch64-apple-ios target)
+scripts/build-idevice.sh
 open iPhoneUse.xcodeproj        # set your team, run the iPhoneUse scheme on the phone
 ```
 

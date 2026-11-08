@@ -1,0 +1,36 @@
+{
+  "name": "iphone-use-app",
+  "identifier": "blog.eliot.iphoneuse.source",
+  "subtitle": "An AI agent that uses your iPhone, from the iPhone itself.",
+  "iconURL": "https://raw.githubusercontent.com/EliotAndres/iphone-use-app/main/docs/images/logo.png",
+  "website": "https://github.com/EliotAndres/iphone-use-app",
+  "apps": [
+    {
+      "name": "iphone-use-app",
+      "bundleIdentifier": "blog.eliot.iphoneuse",
+      "developerName": "Eliot Andres",
+      "subtitle": "Let an AI model use your iPhone.",
+      "localizedDescription": "Type a goal and a vision model drives your iPhone: screenshot, tap, swipe, type, open apps, until it's done. No Mac at run time, no extra hardware, no jailbreak. Needs Developer Mode, a pairing file made once from a Mac, LocalDevVPN, and an OpenRouter (or OpenAI-compatible) key.",
+      "iconURL": "https://raw.githubusercontent.com/EliotAndres/iphone-use-app/main/docs/images/logo.png",
+      "tintColor": "#E879F9",
+      "category": "utilities",
+      "screenshots": [
+        "https://raw.githubusercontent.com/EliotAndres/iphone-use-app/main/docs/images/screen-home.jpg",
+        "https://raw.githubusercontent.com/EliotAndres/iphone-use-app/main/docs/images/screen-steps.jpg"
+      ],
+      "versions": [
+        {
+          "version": "0.1",
+          "buildVersion": "1",
+          "date": "2026-11-08",
+          "localizedDescription": "First release. Free Apple ID build: uses LocalDevVPN instead of the built-in VPN.",
+          "downloadURL": "https://github.com/EliotAndres/iphone-use-app/releases/download/v0.1/iphone-use-app.ipa",
+          "size": 10907914,
+          "minOSVersion": "17.4"
+        }
+      ],
+      "appPermissions": { "entitlements": [], "privacy": {} }
+    }
+  ],
+  "news": []
+}
