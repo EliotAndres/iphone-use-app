@@ -163,7 +163,7 @@ enum LoopbackVPN {
             try await Task.sleep(for: .milliseconds(200))
         }
         throw NSError(domain: "iPhoneUse", code: -20, userInfo: [
-            NSLocalizedDescriptionKey: "The loopback VPN did not connect (status \(connection.status.rawValue)). Is Wi-Fi on?",
+            NSLocalizedDescriptionKey: "The loopback VPN did not connect (status \(connection.status.rawValue)). Is Wi-Fi on? If it keeps failing, restart the iPhone: iOS's VPN service can get stuck.",
         ])
     }
 
