@@ -721,7 +721,9 @@ private struct ConnectionStatus: View {
                 Image(systemName: "circle").foregroundStyle(.secondary)
                 Text("Not connected").foregroundStyle(.secondary)
             case .working(let message):
+                // No text baseline of its own: put its centre on the text's first line.
                 ProgressView().controlSize(.mini)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                 Text(message).foregroundStyle(.secondary)
             case .ready:
                 Image(systemName: "circle.fill").foregroundStyle(.green)
