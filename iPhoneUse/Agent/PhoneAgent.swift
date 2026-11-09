@@ -330,6 +330,7 @@ final class PhoneAgent: ObservableObject {
 
         for step in 1...config.maxSteps {
             if Task.isCancelled { return "stopped" }
+            if Spend.exceeded { return "error: \(Spend.reachedMessage)" }
             let t0 = Date()
             let raw: Data
             do {
@@ -340,6 +341,8 @@ final class PhoneAgent: ObservableObject {
             let tShot = Date().timeIntervalSince(t0)
 
             let decision: Decide.Decision
+            let spentBefore = Decide.spent
+            defer { Spend.add(Decide.spent - spentBefore) }
             do {
                 decision = try await Decide.next(task: prompt, messages: &messages, screenshot: raw, step: step,
                                                  config: config)

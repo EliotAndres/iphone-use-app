@@ -20,6 +20,8 @@ struct SettingsView: View {
     @ObservedObject private var connection = Connection.shared
     @ObservedObject private var location = BackgroundLocationManager.shared
     @AppStorage("keepAliveLocation") private var keepAliveLocation = true
+    @AppStorage(Spend.limitKey) private var spendLimit = 5.0
+    @AppStorage(Spend.totalKey) private var spent = 0.0
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var hasPairingFile = Connection.shared.hasPairingFile
@@ -96,6 +98,11 @@ struct SettingsView: View {
 
                 Section("Agent") {
                     Stepper("Max steps: \(llm.maxSteps)", value: $llm.maxSteps, in: 5...200, step: 5)
+                    Stepper(spendLimit > 0 ? String(format: "Spend limit: $%.0f", spendLimit) : "Spend limit: none",
+                            value: $spendLimit, in: 0...200, step: 1)
+                    LabeledContent(String(format: "Spent: $%.2f", spent)) {
+                        Button("Reset") { spent = 0 }.disabled(spent == 0)
+                    }
                     NavigationLink("System Prompt") { SystemPromptEditor(settings: llm) }
                     NavigationLink("Shortcuts & Deep Link") { ShortcutsGuideView() }
                     Button("Clear History", role: .destructive) { showClearHistoryConfirmation = true }

@@ -162,6 +162,18 @@ final class LLMSettings: ObservableObject {
     }
 }
 
+/// Running total of what the agent (OpenRouter `usage.cost`) and live voice (GPT-Live minutes)
+/// cost, in USD, stopped at a limit ($5 by default, 0 = none). Reset by hand in Settings.
+enum Spend {
+    static let limitKey = "spendLimit", totalKey = "spentUSD"
+    static var limit: Double { UserDefaults.standard.object(forKey: limitKey) as? Double ?? 5 }
+    static var total: Double { UserDefaults.standard.double(forKey: totalKey) }
+    static var exceeded: Bool { limit > 0 && total >= limit }
+    static var reachedMessage: String { String(format: "Spend limit of $%.0f reached. Raise or reset it in Settings.", limit) }
+    // ponytail: read-modify-write without a lock; the agent and a call rarely add at the same instant.
+    static func add(_ usd: Double) { if usd > 0 { UserDefaults.standard.set(total + usd, forKey: totalKey) } }
+}
+
 /// Generic-password items, this device only.
 enum Keychain {
     private static func query(_ account: String) -> [String: Any] {

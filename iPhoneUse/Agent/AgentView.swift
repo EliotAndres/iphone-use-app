@@ -330,8 +330,15 @@ private struct LiveBar: View {
                     Waveform(meter: live.meter, transcribing: live.state == .connecting)
                 }
             }
-            Text(status).font(.footnote).foregroundStyle(live.error != nil && live.state == .off ? .red : .secondary)
-                .lineLimit(3)
+            // Scrollable, pinned to the newest words as they stream in.
+            ScrollView {
+                Text(status).font(.footnote).foregroundStyle(live.error != nil && live.state == .off ? .red : .secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 64)
+            .fixedSize(horizontal: false, vertical: true)
+            .defaultScrollAnchor(.bottom)
+            .defaultScrollAnchor(.bottom, for: .sizeChanges)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)

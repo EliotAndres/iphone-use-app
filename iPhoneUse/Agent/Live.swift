@@ -34,6 +34,8 @@ final class LiveVoice: ObservableObject {
     private var answered: Set<String> = []
     /// The chat this call's tasks go into, so a call is one chat.
     private var callRun: RunRecord.ID?
+    /// Session seconds already added to `Spend` (usage.seconds is cumulative).
+    private var billedSeconds = 0.0
 
     private static let instructions = """
     You are the voice of an assistant that operates this iPhone for its owner. Speak briefly, \
@@ -110,6 +112,7 @@ final class LiveVoice: ObservableObject {
         caption = ""
         let settings = LLMSettings.shared
         guard !settings.openAIKey.isEmpty else { error = "Add an OpenAI API key."; return }
+        guard !Spend.exceeded else { error = Spend.reachedMessage; return }
         guard await AVAudioApplication.requestRecordPermission() else {
             error = "Allow microphone access in Settings to use voice."
             return
@@ -124,6 +127,7 @@ final class LiveVoice: ObservableObject {
         started = false
         answered = []
         callRun = nil
+        billedSeconds = 0
         (sentChunks, gotChunks, peak) = (0, 0, 0)
         try? FileManager.default.removeItem(at: Self.logURL)
         log("connecting, voice \(settings.liveModel), tools \(settings.liveBackendModel)")
@@ -256,7 +260,7 @@ final class LiveVoice: ObservableObject {
             // A continuous track, silence included; GPT-Live handles barge-in itself.
             if let b64 = event["delta"] as? String, let pcm = Data(base64Encoded: b64) { play(pcm) }
         case "session.output_transcript.delta":
-            caption = String((caption + (event["delta"] as? String ?? "")).suffix(200))
+            caption = String((caption + (event["delta"] as? String ?? "")).suffix(4000))
         case "session.input_transcript.delta":
             caption = "" // the user is talking
         case "session.delegation.created":
@@ -275,7 +279,10 @@ final class LiveVoice: ObservableObject {
             let args = (item["arguments"] as? String)
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]
             call(item["name"] as? String ?? "", args, id: item["call_id"] as? String ?? "")
+        case "session.usage.updated":
+            bill(event)
         case "session.closed":
+            bill(event)
             fail("Session ended: \(event["reason"] as? String ?? "closed")")
         case "error":
             let message = (event["error"] as? [String: Any])?["message"] as? String ?? "\(event)"
@@ -284,6 +291,16 @@ final class LiveVoice: ObservableObject {
         default:
             break
         }
+    }
+
+    /// GPT-Live is $0.05 a minute, billed per second.
+    // ponytail: the tool model's tokens are billed separately and not counted (short text, cents).
+    private func bill(_ event: [String: Any]) {
+        guard let seconds = ((event["usage"] as? [String: Any])?["seconds"] as? NSNumber)?.doubleValue,
+              seconds > billedSeconds else { return }
+        Spend.add((seconds - billedSeconds) * 0.05 / 60)
+        billedSeconds = seconds
+        if Spend.exceeded { fail(Spend.reachedMessage) }
     }
 
     private func call(_ name: String, _ args: [String: Any], id: String) {
