@@ -13,6 +13,9 @@ final class BackgroundAudioManager {
     private var isRunning = false
     private var activityCount = 0
     private var healthCheckTimer: Timer?
+    /// Live voice owns the audio session (and its open mic keeps the app alive), so the silent
+    /// player must not switch it to `.playback`.
+    var suspended = false { didSet { refreshRunningState() } }
 
     private init() {
         NotificationCenter.default.addObserver(
@@ -44,7 +47,7 @@ final class BackgroundAudioManager {
     }
 
     private func refreshRunningState() {
-        let shouldRun = activityCount > 0 && UserDefaults.standard.bool(forKey: "keepAliveAudio")
+        let shouldRun = activityCount > 0 && !suspended && UserDefaults.standard.bool(forKey: "keepAliveAudio")
         guard shouldRun != isRunning else {
             if shouldRun {
                 recoverIfNeeded()

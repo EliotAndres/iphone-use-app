@@ -50,7 +50,7 @@ final class VoiceRecorder: ObservableObject {
             engine = AVAudioEngine()
             pcm = Data()
             meter.levels = []
-            try Self.installTap(on: engine.inputNode) { [weak self] chunk, level in
+            try Self.installTap(on: engine.inputNode, format: Self.format) { [weak self] chunk, level in
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
                         guard let self, self.state == .recording else { return }
@@ -91,8 +91,9 @@ final class VoiceRecorder: ObservableObject {
     }
 
     /// Runs on the audio thread, so it must not inherit the main actor.
-    nonisolated private static func installTap(on input: AVAudioInputNode,
-                                               onChunk: @escaping @Sendable (Data, Float) -> Void) throws {
+    /// Also used by `LiveVoice`, at 24 kHz.
+    nonisolated static func installTap(on input: AVAudioInputNode, format: AVAudioFormat,
+                                       onChunk: @escaping @Sendable (Data, Float) -> Void) throws {
         let inputFormat = input.outputFormat(forBus: 0)
         guard let converter = AVAudioConverter(from: inputFormat, to: format) else {
             throw NSError(domain: "voice", code: 0, userInfo: [NSLocalizedDescriptionKey: "No microphone input."])

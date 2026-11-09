@@ -14,6 +14,9 @@ struct AgentView: View {
     @ObservedObject private var connection = Connection.shared
     @ObservedObject private var llm = LLMSettings.shared
     @ObservedObject private var voice = VoiceRecorder.shared
+    @ObservedObject private var live = LiveVoice.shared
+    @State private var askKey = false
+    @State private var keyDraft = ""
     @State private var prompt = ""
     @FocusState private var composerFocused: Bool
     @State private var openRun: RunRecord.ID? // nil = the live chat
@@ -56,6 +59,17 @@ struct AgentView: View {
         }
         .onAppear { composerFocused = true } // keyboard up at launch, ready to type
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .alert("OpenAI API key", isPresented: $askKey) {
+            SecureField("sk-...", text: $keyDraft)
+            Button("Cancel", role: .cancel) {}
+            Button("Start") {
+                llm.openAIKey = keyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                keyDraft = ""
+                Task { await live.start() }
+            }
+        } message: {
+            Text("Live voice uses OpenAI's Realtime API. The key stays in this phone's Keychain; change it in Settings.")
+        }
         .sheet(isPresented: $showShortcutsGuide) {
             NavigationStack {
                 ShortcutsGuideView().toolbar { Button("Done") { showShortcutsGuide = false } }
@@ -133,6 +147,7 @@ struct AgentView: View {
             .animation(.snappy, value: connection.step)
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 8) {
+                    if live.state != .off || live.error != nil { LiveBar(live: live, agent: agent) }
                     if let error = voice.error {
                         Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 20)
                     }
@@ -157,6 +172,14 @@ struct AgentView: View {
                     Button("Chats", systemImage: "line.3.horizontal") { setMenu(true) }
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button(live.state == .off ? "Talk" : "Hang Up", systemImage: live.state == .off ? "phone" : "phone.down.fill") {
+                        if live.state == .off && llm.openAIKey.isEmpty { return askKey = true }
+                        openRun = nil
+                        composerFocused = false
+                        Task { await live.toggle() }
+                    }
+                    .tint(live.state == .off ? nil : .red)
+                    .sensoryFeedback(.impact, trigger: live.state)
                     Button("New Chat", systemImage: "square.and.pencil") { select(nil) }
                         .disabled(openRun == nil && (agent.entries.isEmpty || agent.isRunning))
                     Button { showSettings = true } label: {
@@ -242,7 +265,7 @@ struct AgentView: View {
             } else {
                 Waveform(meter: voice.meter, transcribing: voice.state == .transcribing)
             }
-            if composerEnabled {
+            if composerEnabled && live.state == .off {
                 MicButton(voice: voice, enabled: llm.voiceAvailable) { finishVoice(send: $0) }
             }
             Button(action: send) {
@@ -290,6 +313,36 @@ struct AgentView: View {
             prompt = prompt.isEmpty ? text : prompt + " " + text
             if send { self.send() }
         }
+    }
+}
+
+/// Live voice status over the composer: waveform, what the model says, what the agent does.
+private struct LiveBar: View {
+    @ObservedObject var live: LiveVoice
+    @ObservedObject var agent: PhoneAgent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if live.state != .off {
+                HStack(spacing: 10) {
+                    Image(systemName: "waveform").foregroundStyle(.green)
+                    Waveform(meter: live.meter, transcribing: live.state == .connecting)
+                }
+            }
+            Text(status).font(.footnote).foregroundStyle(live.error != nil && live.state == .off ? .red : .secondary)
+                .lineLimit(3)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .glass(in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 12)
+    }
+
+    private var status: String {
+        if let error = live.error { return error }
+        if live.state == .connecting { return "Connecting…" }
+        if !live.caption.isEmpty { return live.caption }
+        return agent.isRunning ? "Working…" : "Listening"
     }
 }
 

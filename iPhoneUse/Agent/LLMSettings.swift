@@ -70,6 +70,9 @@ final class LLMSettings: ObservableObject {
     @Published var voiceModel: String { didSet { defaults.set(voiceModel, forKey: "voiceModel") } }
     /// ISO-639-1 code; empty means auto-detect.
     @Published var voiceLanguage: String { didSet { defaults.set(voiceLanguage, forKey: "voiceLanguage") } }
+    /// Live voice talks to OpenAI's Realtime API directly (OpenRouter has no realtime endpoint).
+    @Published var openAIKey: String { didSet { Keychain.set(openAIKey, for: "apiKey.openai") } }
+    @Published var realtimeModel: String { didSet { defaults.set(realtimeModel, forKey: "realtimeModel") } }
 
     @Published private(set) var models: [String] = []
     @Published private(set) var loadingModels = false
@@ -88,6 +91,8 @@ final class LLMSettings: ObservableObject {
         apiKey = Keychain.get("apiKey.\(provider.rawValue)") ?? ""
         voiceModel = defaults.string(forKey: "voiceModel") ?? Self.voiceModels[0]
         voiceLanguage = defaults.string(forKey: "voiceLanguage") ?? ""
+        openAIKey = Keychain.get("apiKey.openai") ?? ""
+        realtimeModel = defaults.string(forKey: "realtimeModel") ?? "gpt-realtime-2"
     }
 
     var baseURL: String {

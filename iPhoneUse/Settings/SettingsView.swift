@@ -76,6 +76,22 @@ struct SettingsView: View {
                 }
                 .disabled(llm.provider != .openRouter)
 
+                Section {
+                    SecureField("OpenAI API key", text: $llm.openAIKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    LabeledContent("Model") {
+                        TextField("gpt-realtime-2", text: $llm.realtimeModel)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                } header: {
+                    Text("Live Voice")
+                } footer: {
+                    Text("The phone button on the chat opens a live conversation with OpenAI's Realtime API. It hands phone tasks to the agent above.")
+                }
+
                 Section("Agent") {
                     Stepper("Max steps: \(llm.maxSteps)", value: $llm.maxSteps, in: 5...200, step: 5)
                     NavigationLink("System Prompt") { SystemPromptEditor(settings: llm) }
