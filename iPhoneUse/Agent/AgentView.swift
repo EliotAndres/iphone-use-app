@@ -94,6 +94,7 @@ struct AgentView: View {
             // scripts/runscript.sh) or `-agentPrompt "..."` (real run).
             let launchArgs = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
             guard !agent.isRunning, agent.log.isEmpty else { return }
+            if launchArgs["liveMicTest"] != nil { return LiveVoice.shared.micTest() }
             if let script = launchArgs["agentScript"] as? String {
                 agent.runScript(script)
             } else if let auto = launchArgs["agentPrompt"] as? String, !auto.isEmpty {

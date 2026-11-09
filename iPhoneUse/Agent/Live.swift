@@ -22,16 +22,14 @@ final class LiveVoice: ObservableObject {
     @Published private(set) var error: String?
     let meter = LevelMeter()
 
-    nonisolated private static let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24_000, channels: 1, interleaved: true)!
-    nonisolated private static let playFormat = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
-
     private var socket: URLSessionWebSocketTask?
-    private var engine = AVAudioEngine()
-    private var player = AVAudioPlayerNode()
+    private var audio: VoiceIO?
     private var observers: Set<AnyCancellable> = []
     private var wasRunning = false
-    /// Audio sent before `session.started` is dropped by the server.
     private var started = false
+    /// Mic chunks sent / output audio chunks received / loudest mic level, logged every 5 s.
+    private var sentChunks = 0, gotChunks = 0, peak: Float = 0
+    nonisolated private static let logURL = URL.documentsDirectory.appending(path: "live.log")
     /// Delegations the backend already answered for; see `session.delegation.created`.
     private var answered: Set<String> = []
 
@@ -80,6 +78,24 @@ final class LiveVoice: ObservableObject {
         }.store(in: &observers)
     }
 
+    /// Launch arg `-liveMicTest YES`: mic only, no socket, 6 s, then see Documents/live.log.
+    func micTest() {
+        try? FileManager.default.removeItem(at: Self.logURL)
+        log("mic test")
+        do {
+            BackgroundAudioManager.shared.suspended = true
+            try startAudio()
+            state = .live
+        } catch {
+            log("startAudio failed: \(error)")
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(6))
+            log("mic test end: \(sentChunks) chunks, peak \(peak)")
+            stop()
+        }
+    }
+
     func toggle() async {
         if state == .off { await start() } else { stop() }
     }
@@ -103,6 +119,9 @@ final class LiveVoice: ObservableObject {
         socket.resume()
         started = false
         answered = []
+        (sentChunks, gotChunks, peak) = (0, 0, 0)
+        try? FileManager.default.removeItem(at: Self.logURL)
+        log("connecting, voice \(settings.liveModel), tools \(settings.liveBackendModel)")
         send(["type": "session.start", "session": [
             "model": settings.liveModel.trimmingCharacters(in: .whitespaces),
             "instructions": Self.instructions,
@@ -129,8 +148,8 @@ final class LiveVoice: ObservableObject {
         send(["type": "session.close"])
         socket?.cancel(with: .normalClosure, reason: nil)
         socket = nil
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        audio?.stop()
+        audio = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         BackgroundAudioManager.shared.suspended = false
         meter.levels = []
@@ -147,45 +166,49 @@ final class LiveVoice: ObservableObject {
 
     private func startAudio() throws {
         let session = AVAudioSession.sharedInstance()
-        // voiceChat = Apple's echo cancellation, so the model doesn't hear itself on the speaker.
         try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try session.setActive(true)
-        engine = AVAudioEngine()
-        player = AVAudioPlayerNode()
-        try engine.inputNode.setVoiceProcessingEnabled(true)
-        engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: Self.playFormat)
-        try VoiceRecorder.installTap(on: engine.inputNode, format: Self.format) { [weak self] chunk, level in
+        let audio = VoiceIO { [weak self] chunk, level in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self, self.state == .live else { return }
-                    // GPT-Live wants the mic streamed continuously, silence included.
-                    if self.started { self.send(["type": "session.input_audio.append", "audio": chunk.base64EncodedString()]) }
+                    // GPT-Live wants the mic streamed continuously, silence included. Not gated on
+                    // session.started: the server drops early audio anyway.
+                    self.send(["type": "session.input_audio.append", "audio": chunk.base64EncodedString()])
+                    self.sentChunks += 1
+                    self.peak = max(self.peak, level)
+                    if self.sentChunks % 100 == 0 {
+                        self.log("mic: sent \(self.sentChunks) chunks, peak level \(self.peak), got \(self.gotChunks) audio chunks, started \(self.started)")
+                        self.peak = 0
+                    }
                     self.meter.levels = (self.meter.levels + [level]).suffix(VoiceRecorder.levelCount)
                 }
             }
         }
-        try engine.start()
-        player.play()
+        try audio.start()
+        self.audio = audio
+        log("audio started, route \(session.currentRoute.inputs.map(\.portName)) -> \(session.currentRoute.outputs.map(\.portName))")
     }
 
     private func resumeAudio() {
         guard state != .off else { return }
         try? AVAudioSession.sharedInstance().setActive(true)
-        if !engine.isRunning { try? engine.start() }
-        player.play()
+        try? audio?.start()
     }
 
     private func play(_ pcm: Data) {
-        let frames = AVAudioFrameCount(pcm.count / 2)
-        guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: Self.playFormat, frameCapacity: frames) else { return }
-        buffer.frameLength = frames
-        let out = buffer.floatChannelData![0]
-        pcm.withUnsafeBytes { raw in
-            for (i, sample) in raw.bindMemory(to: Int16.self).enumerated() { out[i] = Float(Int16(littleEndian: sample)) / 32768 }
+        audio?.enqueue(pcm)
+    }
+
+    func log(_ line: String) {
+        let stamped = Data("\(Date().formatted(date: .omitted, time: .standard)) \(line)\n".utf8)
+        if let handle = try? FileHandle(forWritingTo: Self.logURL) {
+            handle.seekToEndOfFile()
+            handle.write(stamped)
+            try? handle.close()
+        } else {
+            try? stamped.write(to: Self.logURL)
         }
-        player.scheduleBuffer(buffer)
-        if !player.isPlaying { player.play() }
     }
 
     // MARK: Socket
@@ -195,7 +218,7 @@ final class LiveVoice: ObservableObject {
               let text = String(data: data, encoding: .utf8) else { return }
         socket.send(.string(text)) { error in
             guard let error else { return }
-            Task { @MainActor [weak self] in self?.fail(error.localizedDescription) }
+            Task { @MainActor [weak self] in self?.log("send failed: \(error)"); self?.fail(error.localizedDescription) }
         }
     }
 
@@ -210,6 +233,7 @@ final class LiveVoice: ObservableObject {
                 }
             } catch {
                 guard let self, self.socket === socket else { return }
+                self.log("socket closed: \(error), close code \(socket.closeCode.rawValue), reason \(socket.closeReason.flatMap { String(data: $0, encoding: .utf8) } ?? "")")
                 self.fail("Connection closed: \(error.localizedDescription)")
             }
         }
@@ -217,6 +241,9 @@ final class LiveVoice: ObservableObject {
 
     private func handle(_ event: [String: Any]) {
         let type = event["type"] as? String ?? ""
+        if type == "session.output_audio.delta" { gotChunks += 1 } else {
+            log("<- " + String((String(data: (try? JSONSerialization.data(withJSONObject: event)) ?? Data(), encoding: .utf8) ?? type).prefix(600)))
+        }
         switch type {
         case "session.started":
             started = true
@@ -290,5 +317,100 @@ final class LiveVoice: ObservableObject {
     private func tell(_ text: String) {
         guard state == .live, started else { return }
         send(["type": "session.commentary.append", "delegation_id": NSNull(), "content": text])
+    }
+}
+
+/// The VoiceProcessingIO audio unit (echo cancellation, as in FaceTime / WebRTC), with mic and
+/// speaker both 24 kHz mono PCM16 so no conversion is needed. AVAudioEngine's voice processing
+/// mode delivered no mic buffers at all on iOS 26/27 (tested on a 16 Pro), hence the raw unit.
+final class VoiceIO: @unchecked Sendable {
+    private var unit: AudioUnit?
+    private let onMic: @Sendable (Data, Float) -> Void
+    // ponytail: a lock on the render thread, fine at 24 kHz; a lock-free ring if it ever glitches.
+    private let lock = NSLock()
+    private var queue = Data()
+    private let micBuffer = UnsafeMutableRawPointer.allocate(byteCount: 16_384, alignment: 2)
+
+    init(onMic: @escaping @Sendable (Data, Float) -> Void) { self.onMic = onMic }
+    deinit { stop(); micBuffer.deallocate() }
+
+    func start() throws {
+        if let unit { return try check(AudioOutputUnitStart(unit), "start") }
+        var desc = AudioComponentDescription(componentType: kAudioUnitType_Output, componentSubType: kAudioUnitSubType_VoiceProcessingIO,
+                                             componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
+        guard let component = AudioComponentFindNext(nil, &desc) else { throw Self.error("no voice processing unit") }
+        var made: AudioUnit?
+        try check(AudioComponentInstanceNew(component, &made), "new")
+        guard let unit = made else { throw Self.error("no unit") }
+        self.unit = unit
+        var on: UInt32 = 1
+        try check(AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &on, 4), "enable mic")
+        var format = AudioStreamBasicDescription(mSampleRate: 24_000, mFormatID: kAudioFormatLinearPCM,
+                                                 mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
+                                                 mBytesPerPacket: 2, mFramesPerPacket: 1, mBytesPerFrame: 2, mChannelsPerFrame: 1,
+                                                 mBitsPerChannel: 16, mReserved: 0)
+        let size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        try check(AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &format, size), "mic format")
+        try check(AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, size), "speaker format")
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        var mic = AURenderCallbackStruct(inputProc: Self.micCallback, inputProcRefCon: me)
+        var speaker = AURenderCallbackStruct(inputProc: Self.speakerCallback, inputProcRefCon: me)
+        let callbackSize = UInt32(MemoryLayout<AURenderCallbackStruct>.size)
+        try check(AudioUnitSetProperty(unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 1, &mic, callbackSize), "mic callback")
+        try check(AudioUnitSetProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &speaker, callbackSize), "speaker callback")
+        try check(AudioUnitInitialize(unit), "initialize")
+        try check(AudioOutputUnitStart(unit), "start")
+    }
+
+    func stop() {
+        guard let unit else { return }
+        AudioOutputUnitStop(unit)
+        AudioUnitUninitialize(unit)
+        AudioComponentInstanceDispose(unit)
+        self.unit = nil
+    }
+
+    func enqueue(_ pcm: Data) {
+        lock.lock()
+        queue.append(pcm)
+        lock.unlock()
+    }
+
+    private static let micCallback: AURenderCallback = { refCon, flags, time, bus, frames, _ in
+        let io = Unmanaged<VoiceIO>.fromOpaque(refCon).takeUnretainedValue()
+        guard let unit = io.unit else { return noErr }
+        let bytes = min(Int(frames) * 2, 16_384)
+        var list = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(mNumberChannels: 1, mDataByteSize: UInt32(bytes), mData: io.micBuffer))
+        let status = AudioUnitRender(unit, flags, time, bus, frames, &list)
+        guard status == noErr else { return status }
+        let count = Int(list.mBuffers.mDataByteSize) / 2
+        let samples = UnsafeBufferPointer(start: io.micBuffer.assumingMemoryBound(to: Int16.self), count: count)
+        guard count > 0 else { return noErr }
+        let rms = sqrt(samples.reduce(0) { $0 + Float($1) * Float($1) } / Float(count)) / Float(Int16.max)
+        let level = max(0, min(1, (20 * log10(max(rms, 1e-6)) + 50) / 50)) // -50...0 dB, as in VoiceRecorder
+        io.onMic(Data(buffer: samples), level)
+        return noErr
+    }
+
+    private static let speakerCallback: AURenderCallback = { refCon, _, _, _, frames, data in
+        let io = Unmanaged<VoiceIO>.fromOpaque(refCon).takeUnretainedValue()
+        guard let buffer = UnsafeMutableAudioBufferListPointer(data)?.first, let out = buffer.mData else { return noErr }
+        let want = Int(buffer.mDataByteSize)
+        io.lock.lock()
+        let n = min(want, io.queue.count)
+        io.queue.copyBytes(to: out.assumingMemoryBound(to: UInt8.self), count: n)
+        io.queue = io.queue.dropFirst(n)
+        io.lock.unlock()
+        if n < want { memset(out + n, 0, want - n) }
+        return noErr
+    }
+
+    private func check(_ status: OSStatus, _ what: String) throws {
+        guard status != noErr else { return }
+        throw Self.error("\(what) failed (\(status))")
+    }
+
+    private static func error(_ message: String) -> NSError {
+        NSError(domain: "voiceio", code: 0, userInfo: [NSLocalizedDescriptionKey: "Audio: \(message)"])
     }
 }
