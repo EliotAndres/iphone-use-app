@@ -1,10 +1,11 @@
 //
-//  Realtime.swift
+//  Live.swift
 //  iPhoneUse
 //
-//  Live voice: an open mic + speaker on OpenAI's Realtime API over a WebSocket. The voice
-//  model only talks; it hands phone work to PhoneAgent (the screenshot -> tap loop) with
-//  run_task, relays the loop's questions, and announces the outcome. Plan: docs/REALTIME_VOICE.md.
+//  Live voice: an open mic + speaker on OpenAI's GPT-Live (wss /v1/live/sessions). GPT-Live
+//  only talks; it delegates to a Responses "tool model", whose run_task / stop_task /
+//  answer_question calls drive PhoneAgent (the screenshot -> tap loop). The loop's questions and
+//  outcome come back as commentary GPT-Live says aloud. Plan: docs/REALTIME_VOICE.md.
 //
 
 import AVFoundation
@@ -29,15 +30,24 @@ final class LiveVoice: ObservableObject {
     private var player = AVAudioPlayerNode()
     private var observers: Set<AnyCancellable> = []
     private var wasRunning = false
+    /// Audio sent before `session.started` is dropped by the server.
+    private var started = false
+    /// Delegations the backend already answered for; see `session.delegation.created`.
+    private var answered: Set<String> = []
 
     private static let instructions = """
     You are the voice of an assistant that operates this iPhone for its owner. Speak briefly, \
-    one or two sentences, in the user's language. When the user wants something done on the \
-    phone, call run_task with a complete, self-contained task in English (include every detail \
-    the user gave). A separate agent then works the screen; you can't see it. Say in a few words \
-    that you're on it. You'll get system messages: if the agent asks a question, ask the user, \
-    then pass the reply with answer_question. When it finishes, tell the user the result. \
-    If the user says stop or cancel during a task, call stop_task.
+    one or two sentences, in the user's language. Delegate anything to do on the phone, any stop \
+    or cancel, and any answer to the agent's question. When you are told the agent asks \
+    something, ask the user. When told a task ended, tell the user the result in one sentence.
+    """
+
+    private static let backendInstructions = """
+    You route a voice conversation to a phone agent that operates this iPhone (it sees the \
+    screen and taps; you can't). When the user wants something done on the phone, call run_task \
+    with a complete, self-contained task in English including every detail they gave. If they \
+    say stop or cancel, call stop_task. If the agent asked a question and the user replies, call \
+    answer_question. Otherwise answer briefly yourself. Keep replies to one short sentence.
     """
 
     private static let tools: [[String: Any]] = [
@@ -85,22 +95,25 @@ final class LiveVoice: ObservableObject {
             return
         }
         state = .connecting
-        let model = settings.realtimeModel.trimmingCharacters(in: .whitespaces)
-        var request = URLRequest(url: URL(string: "wss://api.openai.com/v1/realtime?model=\(model)")!)
+        var request = URLRequest(url: URL(string: "wss://api.openai.com/v1/live/sessions")!)
         request.setValue("Bearer \(settings.openAIKey)", forHTTPHeaderField: "Authorization")
         let socket = URLSession.shared.webSocketTask(with: request)
         socket.maximumMessageSize = 16 << 20
         self.socket = socket
         socket.resume()
-        send(["type": "session.update", "session": [
-            "type": "realtime",
+        started = false
+        answered = []
+        send(["type": "session.start", "session": [
+            "model": settings.liveModel.trimmingCharacters(in: .whitespaces),
             "instructions": Self.instructions,
-            "tools": Self.tools,
-            "tool_choice": "auto",
-            "audio": [
-                "input": ["format": ["type": "audio/pcm", "rate": 24_000], "turn_detection": ["type": "semantic_vad"]],
-                "output": ["format": ["type": "audio/pcm", "rate": 24_000], "voice": "marin"],
-            ],
+            "audio": ["format": ["type": "audio/pcm", "rate": 24_000], "output": ["voice": "marin"]],
+            "delegation": ["type": "responses", "responses": [
+                "model": settings.liveBackendModel.trimmingCharacters(in: .whitespaces),
+                "instructions": Self.backendInstructions,
+                "tools": Self.tools,
+                "tool_choice": "auto",
+                "parallel_tool_calls": false,
+            ] as [String: Any]],
         ] as [String: Any]])
         receive(socket)
         do {
@@ -113,6 +126,7 @@ final class LiveVoice: ObservableObject {
     }
 
     func stop() {
+        send(["type": "session.close"])
         socket?.cancel(with: .normalClosure, reason: nil)
         socket = nil
         engine.inputNode.removeTap(onBus: 0)
@@ -145,7 +159,8 @@ final class LiveVoice: ObservableObject {
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self, self.state == .live else { return }
-                    self.send(["type": "input_audio_buffer.append", "audio": chunk.base64EncodedString()])
+                    // GPT-Live wants the mic streamed continuously, silence included.
+                    if self.started { self.send(["type": "session.input_audio.append", "audio": chunk.base64EncodedString()]) }
                     self.meter.levels = (self.meter.levels + [level]).suffix(VoiceRecorder.levelCount)
                 }
             }
@@ -203,24 +218,36 @@ final class LiveVoice: ObservableObject {
     private func handle(_ event: [String: Any]) {
         let type = event["type"] as? String ?? ""
         switch type {
-        case "response.output_audio.delta", "response.audio.delta":
+        case "session.started":
+            started = true
+        case "session.output_audio.delta":
+            // A continuous track, silence included; GPT-Live handles barge-in itself.
             if let b64 = event["delta"] as? String, let pcm = Data(base64Encoded: b64) { play(pcm) }
-        case "response.created":
-            caption = ""
-        case "response.output_audio_transcript.delta", "response.audio_transcript.delta":
-            caption += event["delta"] as? String ?? ""
-        case "input_audio_buffer.speech_started":
-            // Barge-in: the server cancels its reply; drop what's still queued to play.
-            // ponytail: no conversation.item.truncate, so the model believes it said the whole reply.
-            player.stop()
-            player.play()
-        case "response.function_call_arguments.done":
-            let args = (event["arguments"] as? String)
+        case "session.output_transcript.delta":
+            caption = String((caption + (event["delta"] as? String ?? "")).suffix(200))
+        case "session.input_transcript.delta":
+            caption = "" // the user is talking
+        case "session.delegation.created":
+            // The docs disagree on whether the client must send response.create to run the
+            // backend; send it only if the backend hasn't started on its own.
+            guard let id = (event["delegation"] as? [String: Any])?["id"] as? String else { break }
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1.5))
+                guard let self, self.state == .live, !self.answered.contains(id) else { return }
+                self.send(["type": "response.create"])
+            }
+        case "response.event":
+            if let id = event["delegation_id"] as? String { answered.insert(id) }
+            guard let inner = event["event"] as? [String: Any], inner["type"] as? String == "response.output_item.done",
+                  let item = inner["item"] as? [String: Any], item["type"] as? String == "function_call" else { break }
+            let args = (item["arguments"] as? String)
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]
-            call(event["name"] as? String ?? "", args, id: event["call_id"] as? String ?? "")
+            call(item["name"] as? String ?? "", args, id: item["call_id"] as? String ?? "")
+        case "session.closed":
+            fail("Session ended: \(event["reason"] as? String ?? "closed")")
         case "error":
             let message = (event["error"] as? [String: Any])?["message"] as? String ?? "\(event)"
-            appLog.error("realtime: \(message, privacy: .public)")
+            appLog.error("live: \(message, privacy: .public)")
             error = message
         default:
             break
@@ -232,7 +259,11 @@ final class LiveVoice: ObservableObject {
         let output: String
         switch name {
         case "run_task":
-            if agent.isRunning {
+            if agent.question != nil {
+                // The backend can't tell a reply to the agent's question from a new request.
+                agent.answer(args["task"] as? String ?? "")
+                output = "Passed to the agent as the answer to its question."
+            } else if agent.isRunning {
                 output = "A task is already running."
             } else {
                 agent.run(prompt: args["task"] as? String ?? "")
@@ -251,16 +282,13 @@ final class LiveVoice: ObservableObject {
         default:
             output = "Unknown tool \(name)."
         }
-        send(["type": "conversation.item.create", "item": ["type": "function_call_output", "call_id": id, "output": output]])
-        send(["type": "response.create"])
+        send(["type": "response.item.create", "item": ["type": "function_call_output", "call_id": id, "output": output]])
+        send(["type": "response.create"]) // results alone don't resume the backend
     }
 
-    /// A system note for the model, which then speaks.
+    /// Something for GPT-Live to say (it may paraphrase).
     private func tell(_ text: String) {
-        guard state == .live else { return }
-        send(["type": "conversation.item.create", "item": [
-            "type": "message", "role": "system", "content": [["type": "input_text", "text": text]],
-        ] as [String: Any]])
-        send(["type": "response.create"])
+        guard state == .live, started else { return }
+        send(["type": "session.commentary.append", "delegation_id": NSNull(), "content": text])
     }
 }

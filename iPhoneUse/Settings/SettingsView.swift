@@ -58,7 +58,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Picker("Model", selection: $llm.voiceModel) {
+                    Picker("Transcription model", selection: $llm.voiceModel) {
                         ForEach(Set(LLMSettings.voiceModels + [llm.voiceModel]).sorted(), id: \.self) { Text($0).tag($0) }
                     }
                     Picker("Language", selection: $llm.voiceLanguage) {
@@ -80,16 +80,18 @@ struct SettingsView: View {
                     SecureField("OpenAI API key", text: $llm.openAIKey)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    LabeledContent("Model") {
-                        TextField("gpt-realtime-2", text: $llm.realtimeModel)
-                            .multilineTextAlignment(.trailing)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                    ForEach([("Voice model", "gpt-live-1", $llm.liveModel), ("Tool model", "gpt-6-luna", $llm.liveBackendModel)], id: \.0) { label, hint, value in
+                        LabeledContent(label) {
+                            TextField(hint, text: value)
+                                .multilineTextAlignment(.trailing)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
                     }
                 } header: {
                     Text("Live Voice")
                 } footer: {
-                    Text("The phone button on the chat opens a live conversation with OpenAI's Realtime API. It hands phone tasks to the agent above.")
+                    Text("The phone button on the chat opens a live conversation with OpenAI's GPT-Live. The tool model it delegates to hands phone tasks to the agent above.")
                 }
 
                 Section("Agent") {

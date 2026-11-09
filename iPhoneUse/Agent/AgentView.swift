@@ -68,7 +68,7 @@ struct AgentView: View {
                 Task { await live.start() }
             }
         } message: {
-            Text("Live voice uses OpenAI's Realtime API. The key stays in this phone's Keychain; change it in Settings.")
+            Text("Live voice uses OpenAI's GPT-Live. The key stays in this phone's Keychain; change it in Settings.")
         }
         .sheet(isPresented: $showShortcutsGuide) {
             NavigationStack {

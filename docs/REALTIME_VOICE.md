@@ -1,7 +1,7 @@
 # Live voice (OpenAI Realtime): plan
 
 Goal: talk to the phone with an open mic and speaker, and have it act through tool calls.
-Branch: `gpt-live-voice-iphone-pla-9d72dda1`. Status: steps 1–4 built (`iPhoneUse/Agent/Realtime.swift`), untested on a phone.
+Branch: `gpt-live-voice-iphone-pla-9d72dda1`. Status: built on GPT-Live (`gpt-live-1`, `iPhoneUse/Agent/Live.swift`) instead of the Realtime API described below; untested on a phone.
 
 ## Can the connection stay open?
 

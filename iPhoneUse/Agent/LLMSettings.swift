@@ -70,9 +70,11 @@ final class LLMSettings: ObservableObject {
     @Published var voiceModel: String { didSet { defaults.set(voiceModel, forKey: "voiceModel") } }
     /// ISO-639-1 code; empty means auto-detect.
     @Published var voiceLanguage: String { didSet { defaults.set(voiceLanguage, forKey: "voiceLanguage") } }
-    /// Live voice talks to OpenAI's Realtime API directly (OpenRouter has no realtime endpoint).
+    /// Live voice talks to OpenAI's GPT-Live API directly (OpenRouter has no live endpoint).
     @Published var openAIKey: String { didSet { Keychain.set(openAIKey, for: "apiKey.openai") } }
-    @Published var realtimeModel: String { didSet { defaults.set(realtimeModel, forKey: "realtimeModel") } }
+    @Published var liveModel: String { didSet { defaults.set(liveModel, forKey: "liveModel") } }
+    /// The Responses model GPT-Live delegates to; it calls run_task & co.
+    @Published var liveBackendModel: String { didSet { defaults.set(liveBackendModel, forKey: "liveBackendModel") } }
 
     @Published private(set) var models: [String] = []
     @Published private(set) var loadingModels = false
@@ -92,7 +94,8 @@ final class LLMSettings: ObservableObject {
         voiceModel = defaults.string(forKey: "voiceModel") ?? Self.voiceModels[0]
         voiceLanguage = defaults.string(forKey: "voiceLanguage") ?? ""
         openAIKey = Keychain.get("apiKey.openai") ?? ""
-        realtimeModel = defaults.string(forKey: "realtimeModel") ?? "gpt-realtime-2"
+        liveModel = defaults.string(forKey: "liveModel") ?? "gpt-live-1"
+        liveBackendModel = defaults.string(forKey: "liveBackendModel") ?? "gpt-6-luna"
     }
 
     var baseURL: String {
