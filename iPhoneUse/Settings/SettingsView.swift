@@ -205,6 +205,16 @@ private struct LLMSettingsView: View {
                 SecureField("API key", text: $settings.apiKey,
                             prompt: Text(settings.provider == .custom ? "API key (optional)" : "API key"))
                 ModelPicker(settings: settings)
+                if settings.provider == .openRouter {
+                    HStack {
+                        ForEach(LLMSettings.quickModels, id: \.id) { model in
+                            Button("Use \(model.name)") { settings.model = model.id }
+                                .buttonStyle(.haptic(.bordered))
+                                .disabled(settings.model == model.id)
+                        }
+                    }
+                    Toggle("Use ultrafast if available (more expensive)", isOn: $settings.fastTier)
+                }
             } footer: {
                 if settings.provider == .openRouter {
                     Link("Get an OpenRouter key", destination: Links.openRouterKeys)

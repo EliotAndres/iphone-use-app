@@ -51,7 +51,6 @@ final class PhoneAgent: ObservableObject {
     private var activity: Activity<AgentActivityAttributes>?
     private var activityState = AgentActivityAttributes.ContentState(step: 0, line: "Starting", running: true)
 
-    nonisolated private static let imageWidth: CGFloat = 450
     private static let historyLimit = 50
     nonisolated private static let logURL = URL.documentsDirectory.appending(path: "agent.log")
     private static let historyURL = URL.documentsDirectory.appending(path: "history.json")
@@ -237,7 +236,7 @@ final class PhoneAgent: ObservableObject {
         isRunning = true
         entries = [ChatEntry(kind: .user, text: "Order my usual coffee from Starbucks")]
         let steps = [
-            ("open_app bundle_id=com.starbucks.mystarbucks", "Opening Starbucks directly."),
+            ("open_app name=Starbucks", "Opening Starbucks directly."),
             ("tap x=225 y=880", "The Order tab is at the bottom."),
             ("swipe x1=225 x2=225 y1=700 y2=300", "Scrolling to find recent orders."),
             ("tap x=120 y=410", "Two recent orders match, I need to know which one."),
@@ -316,39 +315,28 @@ final class PhoneAgent: ObservableObject {
         } catch {
             return "error: no tunnel: \(error.localizedDescription)"
         }
-        let appList = apps.map { "\($0.value): \($0.key)" }.sorted().joined(separator: "\n")
-
-        var messages: [[String: Any]] = [
-            ["role": "system", "content": config.systemPrompt + "\n\nInstalled apps (name: bundle id):\n" + appList],
-            ["role": "user", "content": "Task: \(prompt)"],
-        ]
+        var messages = Decide.firstMessages(task: prompt, config: config)
 
         for step in 1...config.maxSteps {
             if Task.isCancelled { return "stopped" }
             let t0 = Date()
-            let image: (data: Data, size: CGSize)
+            let raw: Data
             do {
-                image = try Self.shrink(device.agentScreenshot(jpeg: false))
+                raw = try device.agentScreenshot(jpeg: false)
             } catch {
                 return "error: screenshot failed: \(error.localizedDescription)"
             }
             let tShot = Date().timeIntervalSince(t0)
 
-            Self.dropOldImages(&messages, keep: 2)
-            messages.append(["role": "user", "content": [
-                ["type": "text", "text": "Step \(step). Screenshot is \(Int(image.size.width))x\(Int(image.size.height)) px."],
-                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + image.data.base64EncodedString()]],
-            ]])
-
-            let reply: [String: Any]
+            let decision: Decide.Decision
             do {
-                reply = try await Self.complete(messages: messages, config: config)
+                decision = try await Decide.next(task: prompt, messages: &messages, screenshot: raw, step: step,
+                                                 config: config)
             } catch {
                 if Task.isCancelled { return "stopped" }
                 return "error: LLM: \(error.localizedDescription)"
             }
-            let tLLM = Date().timeIntervalSince(t0) - tShot
-            messages.append(reply)
+            let (reply, image, timing) = (decision.reply, decision.image, decision.timing)
 
             guard let call = (reply["tool_calls"] as? [[String: Any]])?.first,
                   let function = call["function"] as? [String: Any],
@@ -361,12 +349,14 @@ final class PhoneAgent: ObservableObject {
             let args = (function["arguments"] as? String)
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]
             let thought = (reply["content"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            await say(String(format: "%d %@ %@  (shot %.1fs, llm %.1fs)", step, name, Self.compact(args), tShot, tLLM), step: step,
+            await say(String(format: "%d %@ %@  (shot %.1fs, %@)", step, name, Self.compact(args), tShot, timing), step: step,
                       text: "\(step). \(name) \(Self.compact(args))", thought: thought, image: image.data)
 
             if name == "done" {
                 try? device.agentLaunch(bundleID: Bundle.main.bundleIdentifier ?? "")
-                return "done: \(args["summary"] as? String ?? "")"
+                // Models sometimes put the answer in their message and leave the summary empty.
+                let summary = (args["summary"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? thought ?? ""
+                return "done: \(summary)"
             }
             if name == "ask_user_question" {
                 let question = args["question"] as? String ?? ""
@@ -380,7 +370,7 @@ final class PhoneAgent: ObservableObject {
             }
             let result: String
             do {
-                try Self.perform(name, args, imageSize: image.size, device: device)
+                try Self.perform(name, args, imageSize: image.size, apps: apps, device: device)
                 result = "ok"
             } catch {
                 result = "error: \(error.localizedDescription)"
@@ -392,7 +382,8 @@ final class PhoneAgent: ObservableObject {
         return "gave up after \(config.maxSteps) steps"
     }
 
-    nonisolated private static func perform(_ name: String, _ args: [String: Any], imageSize: CGSize, device: DeviceSession) throws {
+    nonisolated private static func perform(_ name: String, _ args: [String: Any], imageSize: CGSize, apps: [String: String],
+                                             device: DeviceSession) throws {
         func point(_ x: String, _ y: String) -> CGPoint {
             CGPoint(x: num(args[x]) / imageSize.width, y: num(args[y]) / imageSize.height)
         }
@@ -410,7 +401,13 @@ final class PhoneAgent: ObservableObject {
         case "home":
             try device.agentHome()
         case "open_app":
-            try device.agentLaunch(bundleID: args["bundle_id"] as? String ?? "")
+            let appName = args["name"] as? String ?? args["bundle_id"] as? String ?? ""
+            guard let bundleID = Decide.appBundleID(appName, in: apps) else {
+                let similar = Decide.similarApps(appName, in: apps)
+                throw NSError(domain: "agent", code: 3, userInfo: [NSLocalizedDescriptionKey: "No app named \"\(appName)\""
+                    + (similar.isEmpty ? "." : ". Similar: " + similar.joined(separator: ", "))])
+            }
+            try device.agentLaunch(bundleID: bundleID)
         default:
             throw NSError(domain: "agent", code: 1, userInfo: [NSLocalizedDescriptionKey: "unknown tool \(name)"])
         }
@@ -428,91 +425,4 @@ final class PhoneAgent: ObservableObject {
     nonisolated private static func compact(_ args: [String: Any]) -> String {
         args.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: " ")
     }
-
-    /// Downscale so the model sees a small image; returns JPEG + its pixel size.
-    nonisolated private static func shrink(_ data: Data) throws -> (data: Data, size: CGSize) {
-        guard let image = UIImage(data: data) else {
-            throw NSError(domain: "agent", code: 2, userInfo: [NSLocalizedDescriptionKey: "undecodable screenshot"])
-        }
-        let w = imageWidth
-        let size = CGSize(width: w, height: (image.size.height * w / image.size.width).rounded())
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let small = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
-        }
-        return (small.jpegData(compressionQuality: 0.7) ?? data, size)
-    }
-
-    /// Old screenshots cost tokens and add nothing; keep only the latest few.
-    nonisolated private static func dropOldImages(_ messages: inout [[String: Any]], keep: Int) {
-        var seen = 0
-        for i in messages.indices.reversed() {
-            guard let parts = messages[i]["content"] as? [[String: Any]],
-                  parts.contains(where: { $0["type"] as? String == "image_url" }) else { continue }
-            seen += 1
-            if seen > keep {
-                messages[i]["content"] = parts.filter { $0["type"] as? String != "image_url" }
-                    + [["type": "text", "text": "(older screenshot removed)"]]
-            }
-        }
-    }
-
-    nonisolated private static func complete(messages: [[String: Any]], config: LLMConfig) async throws -> [String: Any] {
-        var request = URLRequest(url: config.chatURL)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 90
-        if !config.apiKey.isEmpty { request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization") }
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "model": config.model,
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto",
-            "max_tokens": 1024,
-        ])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        guard let message = ((json?["choices"] as? [[String: Any]])?.first?["message"]) as? [String: Any] else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw NSError(domain: "agent", code: (response as? HTTPURLResponse)?.statusCode ?? 0,
-                          userInfo: [NSLocalizedDescriptionKey: String(body.prefix(400))])
-        }
-        // Echo back only what the API accepts in history.
-        var reply: [String: Any] = ["role": "assistant", "content": message["content"] as? String ?? ""]
-        if let calls = message["tool_calls"] { reply["tool_calls"] = calls }
-        return reply
-    }
-
-    nonisolated private static let tools: [[String: Any]] = {
-        func tool(_ name: String, _ description: String, _ props: [String: String], _ types: [String: String] = [:]) -> [String: Any] {
-            [
-                "type": "function",
-                "function": [
-                    "name": name,
-                    "description": description,
-                    "parameters": [
-                        "type": "object",
-                        "properties": props.reduce(into: [String: Any]()) { out, prop in
-                            out[prop.key] = ["type": types[prop.key] ?? "number", "description": prop.value]
-                        },
-                        "required": Array(props.keys),
-                    ] as [String: Any],
-                ] as [String: Any],
-            ]
-        }
-        return [
-            tool("tap", "Tap a point.", ["x": "x pixel", "y": "y pixel"]),
-            tool("long_press", "Touch and hold a point, e.g. for a context menu.", ["x": "x pixel", "y": "y pixel"]),
-            tool("swipe", "Drag from (x1,y1) to (x2,y2); swipe up to scroll down.",
-                 ["x1": "start x", "y1": "start y", "x2": "end x", "y2": "end y"]),
-            tool("type", "Type text into the focused field.", ["text": "text to type"], ["text": "string"]),
-            tool("home", "Go to the home screen.", [:]),
-            tool("open_app", "Launch an installed app by bundle id.", ["bundle_id": "bundle id"], ["bundle_id": "string"]),
-            tool("ask_user_question", "Ask the phone's owner for missing information or a decision, then wait for the answer. "
-                 + "This app comes to the front while waiting, so reopen the app you were using afterwards.",
-                 ["question": "the question to show the user"], ["question": "string"]),
-            tool("done", "Finish.", ["summary": "what happened"], ["summary": "string"]),
-        ]
-    }()
 }

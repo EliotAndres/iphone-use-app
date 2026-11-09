@@ -1,0 +1,54 @@
+{
+  "task": "Select a Lyft to the Eiffel Tower (don't book yet)",
+  "history": [
+    {
+      "name": "open_app",
+      "args": {
+        "name": "Lyft"
+      }
+    },
+    {
+      "name": "tap",
+      "args": {
+        "x": 225,
+        "y": 243
+      },
+      "thought": "Tap the search field."
+    },
+    {
+      "name": "type",
+      "args": {
+        "text": "Eiffel Tower"
+      }
+    },
+    {
+      "name": "tap",
+      "args": {
+        "x": 225,
+        "y": 320
+      },
+      "thought": "Pick the Eiffel Tower suggestion."
+    },
+    {
+      "name": "tap",
+      "args": {
+        "x": 225,
+        "y": 901
+      },
+      "thought": "Select Standard."
+    }
+  ],
+  "expected": [
+    {
+      "action": "tap",
+      "rects": [
+        [
+          0.1,
+          0.865,
+          0.9,
+          0.94
+        ]
+      ]
+    }
+  ]
+}

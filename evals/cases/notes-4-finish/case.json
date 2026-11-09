@@ -1,0 +1,41 @@
+{
+  "task": "Open notes, write \"hello world\"",
+  "history": [
+    {
+      "name": "open_app",
+      "args": {
+        "name": "Notes"
+      }
+    },
+    {
+      "name": "tap",
+      "args": {
+        "x": 391,
+        "y": 919
+      },
+      "thought": "Tap the new note button."
+    },
+    {
+      "name": "type",
+      "args": {
+        "text": "hello world"
+      }
+    }
+  ],
+  "expected": [
+    {
+      "action": "done"
+    },
+    {
+      "action": "tap",
+      "rects": [
+        [
+          0.83,
+          0.06,
+          0.98,
+          0.135
+        ]
+      ]
+    }
+  ]
+}

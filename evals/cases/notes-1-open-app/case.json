@@ -1,0 +1,9 @@
+{
+  "task": "Open notes, write \"hello world\"",
+  "expected": [
+    {
+      "action": "open_app",
+      "bundle_id": "com.apple.mobilenotes"
+    }
+  ]
+}

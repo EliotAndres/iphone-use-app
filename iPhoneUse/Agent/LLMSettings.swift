@@ -22,6 +22,9 @@ struct LLMConfig: Sendable {
     var model: String
     var maxSteps: Int
     var systemPrompt: String
+    /// Ask OpenRouter for the fast service tier (faster, pricier) where the model has one.
+    var fastTier = false
+    var noReasoning = false
 }
 
 @MainActor
@@ -29,6 +32,8 @@ final class LLMSettings: ObservableObject {
     static let shared = LLMSettings()
     static let openRouterURL = "https://openrouter.ai/api/v1"
     static let defaultModel = "anthropic/claude-sonnet-5.5"
+    /// The "Use …" buttons under the model row.
+    static let quickModels = [(name: "Sonnet", id: "anthropic/claude-sonnet-5.5"), (name: "Haiku", id: "anthropic/claude-haiku-5.5")]
     /// Fast OpenRouter transcription models, first is the default.
     static let voiceModels = [
         "openai/whisper-large-v3-turbo",
@@ -59,6 +64,7 @@ final class LLMSettings: ObservableObject {
     @Published var customURL: String { didSet { defaults.set(customURL, forKey: "llmCustomURL") } }
     @Published var model: String { didSet { defaults.set(model, forKey: "agentModelID") } }
     @Published var maxSteps: Int { didSet { defaults.set(maxSteps, forKey: "agentMaxSteps") } }
+    @Published var fastTier: Bool { didSet { defaults.set(fastTier, forKey: "llmFastTier") } }
     @Published var systemPrompt: String { didSet { defaults.set(systemPrompt, forKey: "agentSystemPrompt") } }
     @Published var apiKey: String { didSet { Keychain.set(apiKey, for: keychainAccount) } }
     @Published var voiceModel: String { didSet { defaults.set(voiceModel, forKey: "voiceModel") } }
@@ -77,6 +83,7 @@ final class LLMSettings: ObservableObject {
         customURL = defaults.string(forKey: "llmCustomURL") ?? ""
         model = defaults.string(forKey: "agentModelID") ?? Self.defaultModel
         maxSteps = defaults.object(forKey: "agentMaxSteps") as? Int ?? 40
+        fastTier = defaults.bool(forKey: "llmFastTier")
         systemPrompt = defaults.string(forKey: "agentSystemPrompt") ?? Self.defaultSystemPrompt
         apiKey = Keychain.get("apiKey.\(provider.rawValue)") ?? ""
         voiceModel = defaults.string(forKey: "voiceModel") ?? Self.voiceModels[0]
@@ -102,7 +109,7 @@ final class LLMSettings: ObservableObject {
     var config: LLMConfig? {
         guard problem == nil, let url = URL(string: baseURL + "/chat/completions") else { return nil }
         return LLMConfig(chatURL: url, apiKey: apiKey, model: model.trimmingCharacters(in: .whitespaces),
-                         maxSteps: max(1, maxSteps), systemPrompt: systemPrompt)
+                         maxSteps: max(1, maxSteps), systemPrompt: systemPrompt, fastTier: fastTier)
     }
 
     /// Checks the key against the endpoint. OpenRouter's /key rejects bad keys; /models is public there.
