@@ -32,6 +32,8 @@ final class LiveVoice: ObservableObject {
     nonisolated private static let logURL = URL.documentsDirectory.appending(path: "live.log")
     /// Delegations the backend already answered for; see `session.delegation.created`.
     private var answered: Set<String> = []
+    /// The chat this call's tasks go into, so a call is one chat.
+    private var callRun: RunRecord.ID?
 
     private static let instructions = """
     You are the voice of an assistant that operates this iPhone for its owner. Speak briefly, \
@@ -119,6 +121,7 @@ final class LiveVoice: ObservableObject {
         socket.resume()
         started = false
         answered = []
+        callRun = nil
         (sentChunks, gotChunks, peak) = (0, 0, 0)
         try? FileManager.default.removeItem(at: Self.logURL)
         log("connecting, voice \(settings.liveModel), tools \(settings.liveBackendModel)")
@@ -293,7 +296,8 @@ final class LiveVoice: ObservableObject {
             } else if agent.isRunning {
                 output = "A task is already running."
             } else {
-                agent.run(prompt: args["task"] as? String ?? "")
+                agent.run(prompt: args["task"] as? String ?? "", continuing: callRun)
+                callRun = agent.liveRun?.id
                 output = "Started. You'll get a system message when the agent asks something or finishes."
             }
         case "stop_task":

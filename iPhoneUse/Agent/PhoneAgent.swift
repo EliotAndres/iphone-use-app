@@ -60,13 +60,22 @@ final class PhoneAgent: ObservableObject {
         history = (try? JSONDecoder().decode([RunRecord].self, from: Data(contentsOf: Self.historyURL))) ?? []
     }
 
-    func run(prompt: String) {
+    /// `continuing`: append to that earlier chat instead of starting one (a live voice call keeps
+    /// all its tasks in one chat). The model still starts fresh each run.
+    func run(prompt: String, continuing id: RunRecord.ID? = nil) {
         guard !isRunning else { return }
         isRunning = true
-        log = ""
-        entries = []
         let settings = LLMSettings.shared
-        liveRun = RunRecord(date: .now, prompt: prompt, model: settings.model, outcome: "running", log: "", entries: [])
+        if let id, var earlier = history.first(where: { $0.id == id }) {
+            earlier.outcome = "running"
+            log = earlier.log
+            entries = earlier.entries ?? []
+            liveRun = earlier
+        } else {
+            log = ""
+            entries = []
+            liveRun = RunRecord(date: .now, prompt: prompt, model: settings.model, outcome: "running", log: "", entries: [])
+        }
         saveLiveRun()
         startKeepAlive()
         startActivity(prompt: prompt)
