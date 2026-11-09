@@ -172,6 +172,7 @@ struct AgentView: View {
         ("message.fill", Color.green, "List my unread WhatsApp conversations (don't open them)"),
         ("car.fill", Color.primary, "Get me an Uber to the closest supermarket"),
         ("creditcard.fill", Color.blue, "Show me my Apple subscriptions, recommend which ones to cancel"),
+        ("bell.slash.fill", Color.orange, "In Uber Eats, disable all marketing notifications"),
     ]
 
     /// Starter prompts on a new chat, sitting just above the composer.
