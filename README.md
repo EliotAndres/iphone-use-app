@@ -35,22 +35,6 @@ types the destination, picks it and stops at the ride options. Middle: the finis
 | **Extra hardware** | None | None | ESP32-S3 board (~$7) on USB-C | None |
 | **How it sees and acts** | CoreDevice screenshots and touches, through a loopback VPN | Apple accessibility features | AirPlay mirroring to the board, USB mouse/keyboard via AssistiveTouch | WebDriverAgent (XCTest) over USB |
 
-## Benchmark
-
-One decision is one screenshot → one tool call. `scripts/eval.sh` replays 11 recorded steps (open Lyft, search a
-destination, pick a ride, stop before paying; write a note) against each model through OpenRouter, run twice
-(22 decisions per row). November 2026; times are full round trips from a Mac.
-
-| Model | Correct | Median | p90 | $ / decision |
-|---|---|---|---|---|
-| **Claude Haiku 5.5 (default)** | 91% | 1.3 s | 2.0 s | $0.0003 |
-| Claude Haiku 5.5, reasoning off | 91% | 1.1 s | 1.5 s | $0.0003 |
-| Claude Sonnet 5.5 (reasoning can't be turned off) | 91% | 1.2 s | 2.5 s | $0.0055 |
-| Claude Opus 5 | 95% | 2.1 s | 4.2 s | $0.014 |
-| Claude Opus 5, fast tier, reasoning off | 100% | 1.4 s | 1.6 s | $0.051 |
-| Claude Opus 5.5 | 86% | 1.8 s | 3.1 s | $0.011 |
-| Claude Opus 5.5, fast tier | 82% | 0.9 s | 1.3 s | $0.021 |
-
 ## Requirements
 
 | Part | Notes |
@@ -94,6 +78,22 @@ flowchart LR
 The app mounts a developer image, then uses a loopback VPN to screenshot and control the iPhone it runs on.
 Each step, the screenshot goes to the model, which answers with a tool call (tap, long press, swipe, type, open app) until it's done.
 A Live Activity shows progress with a Stop button, and every run is saved as a chat.
+
+## Benchmark
+
+One decision is one screenshot → one tool call. `scripts/eval.sh` replays 11 recorded steps (open Lyft, search a
+destination, pick a ride, stop before paying; write a note) against each model through OpenRouter, run twice
+(22 decisions per row). November 2026; times are full round trips from a Mac.
+
+| Model | Correct | Median | p90 | $ / decision |
+|---|---|---|---|---|
+| **Claude Haiku 5.5 (default)** | 91% | 1.3 s | 2.0 s | $0.0003 |
+| Claude Haiku 5.5, reasoning off | 91% | 1.1 s | 1.5 s | $0.0003 |
+| Claude Sonnet 5.5 (reasoning can't be turned off) | 91% | 1.2 s | 2.5 s | $0.0055 |
+| Claude Opus 5 | 95% | 2.1 s | 4.2 s | $0.014 |
+| Claude Opus 5, fast tier, reasoning off | 100% | 1.4 s | 1.6 s | $0.051 |
+| Claude Opus 5.5 | 86% | 1.8 s | 3.1 s | $0.011 |
+| Claude Opus 5.5, fast tier | 82% | 0.9 s | 1.3 s | $0.021 |
 
 ## Quick start
 
