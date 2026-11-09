@@ -13,6 +13,8 @@ doesn't need stays out, to keep the code and the binary small.
 - Live log of each step with timings
 - Connection status line (VPN / tunnel / DDI) *(new)*
 - Run history: past runs in a chat list that slides in from the left *(new)*
+- Optional call mode: phone button in the toolbar, a live conversation with OpenAI GPT-Live that hands tasks to the agent (one chat per call; own OpenAI key, see `docs/REALTIME_VOICE.md`) *(new)*
+- Spend limit ($5 default) on the agent + call minutes, with a running total in Settings *(new)*
 - Red dot on the Settings gear when setup blocks a run (model, pairing file, connection)
 - Installed-app list (name: bundle id) in the system prompt
 - Return to the app when the run is done

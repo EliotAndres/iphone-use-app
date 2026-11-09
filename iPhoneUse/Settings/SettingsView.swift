@@ -54,7 +54,7 @@ struct SettingsView: View {
                         CheckRow("Run in background", detail: backgroundDetail, state: backgroundState)
                     }
                 } header: {
-                    Text("Setup")
+                    Text("Setup · Required")
                 } footer: {
                     Link("How to get a pairing file", destination: Links.pairingFileGuide)
                 }
@@ -91,7 +91,7 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("Live Voice")
+                    Text("GPT Voice · [Optional] For call mode")
                 } footer: {
                     Text("The phone button on the chat opens a live conversation with OpenAI's GPT-Live. The tool model it delegates to hands phone tasks to the agent above.")
                 }
