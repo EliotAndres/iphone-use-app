@@ -99,11 +99,7 @@ destination, pick a ride, stop before paying; write a note) against each model t
 
 ### 1. Make a pairing file
 
-This is the one step that needs a Mac. There is no supported on-device API for the phone's developer services:
-the phone only opens them to a trusted host, the way it does for Xcode. The pairing file holds the keys of such a
-host, so the app can act as one for its own phone. Since iOS 17 these services are reached over a network tunnel
-(RemoteXPC/CoreDevice, the same path as Xcode's wireless debugging) rather than the USB mux, which is why the app
-can reach them through its loopback VPN with no cable. Plug the phone into the Mac, unlock it (tap Trust if asked), then:
+This is the one step that needs a Mac. Plug the phone into the Mac, unlock it (tap Trust if asked), then:
 
 ```sh
 git clone https://github.com/jkcoxson/idevice && cd idevice
