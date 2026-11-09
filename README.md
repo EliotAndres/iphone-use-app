@@ -34,9 +34,6 @@ types the destination, picks it and stops at the ride options. Middle: the finis
 | **Computer at run time** | None (a Mac once, for pairing) | Mac app, phone plugged in | None (a computer once, to flash the board) | Mac (MCP server) |
 | **Extra hardware** | None | None | ESP32-S3 board (~$7) on USB-C | None |
 | **How it sees and acts** | CoreDevice screenshots and touches, through a loopback VPN | Apple accessibility features | AirPlay mirroring to the board, USB mouse/keyboard via AssistiveTouch | WebDriverAgent (XCTest) over USB |
-| **Works away from a desk** | Yes | No | Yes, with the board plugged in | No |
-| **Price / license** | Free, AGPL-3.0 (bring a model key) | $49/month per phone | Free, MIT (firmware GPL-3.0) | Free, MIT |
-| **iOS** | 26+ | n/a | 18+ | What your Xcode supports |
 
 ## Benchmark
 
