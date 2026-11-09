@@ -20,6 +20,15 @@
       ],
       "versions": [
         {
+          "version": "0.2",
+          "buildVersion": "2",
+          "date": "2026-11-08",
+          "localizedDescription": "Haiku 5.5 is the default model. Apps are opened by name (no app list sent to the model). Tap and swipe marks on step screenshots. Use Haiku / Use Sonnet buttons and an ultrafast toggle in Settings. New starter prompt.",
+          "downloadURL": "https://github.com/EliotAndres/iphone-use-app/releases/download/v0.2/iphone-use-app.ipa",
+          "size": 10900748,
+          "minOSVersion": "26.0"
+        },
+        {
           "version": "0.1",
           "buildVersion": "1",
           "date": "2026-11-08",
@@ -29,7 +38,10 @@
           "minOSVersion": "26.0"
         }
       ],
-      "appPermissions": { "entitlements": [], "privacy": {} }
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
     }
   ],
   "news": []
