@@ -59,7 +59,7 @@ struct AgentView: View {
         }
         .onAppear { composerFocused = true } // keyboard up at launch, ready to type
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .alert("OpenAI API key", isPresented: $askKey) {
+        .alert("Call mode needs an OpenAI key", isPresented: $askKey) {
             SecureField("sk-...", text: $keyDraft)
             Button("Cancel", role: .cancel) {}
             Button("Start") {
@@ -68,7 +68,7 @@ struct AgentView: View {
                 Task { await live.start() }
             }
         } message: {
-            Text("Live voice uses OpenAI's GPT-Live. The key stays in this phone's Keychain; change it in Settings.")
+            Text("Call mode is optional: you talk with OpenAI's GPT-Live and it hands tasks to the agent. It needs an OpenAI API key, separate from your model key (OpenRouter has no live voice). Paste it here; it stays in this phone's Keychain and you can change it in Settings → GPT Voice.")
         }
         .sheet(isPresented: $showShortcutsGuide) {
             NavigationStack {
