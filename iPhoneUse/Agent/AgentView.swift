@@ -19,7 +19,6 @@ struct AgentView: View {
     @State private var openRun: RunRecord.ID? // nil = the live chat
     @State private var menuOpen = false
     @State private var drag: CGFloat = 0
-    @State private var carousels = CarouselFrames()
     @State private var showSettings = false
     @State private var showShortcutsGuide = false
 
@@ -35,7 +34,6 @@ struct AgentView: View {
                 // The mask reaches the screen edges, so the rounded corners follow the
                 // display's instead of clipping the toolbar buttons.
                 chat
-                    .environment(\.carouselFrames, carousels)
                     .background(Color(.systemBackground))
                     .mask { RoundedRectangle(cornerRadius: offset > 0 ? 44 : 0, style: .continuous).ignoresSafeArea() }
                     .shadow(color: .black.opacity(offset > 0 ? 0.15 : 0), radius: 12)
@@ -44,19 +42,13 @@ struct AgentView: View {
                     }
                     .offset(x: offset)
             }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 20, coordinateSpace: .global)
-                    .onChanged { g in
-                        // A swipe that starts on a step carousel scrolls it, not the drawer.
-                        if !menuOpen, carousels.frames.values.contains(where: { $0.contains(g.startLocation) }) { return }
-                        if abs(g.translation.width) > abs(g.translation.height) { drag = g.translation.width }
-                    }
-                    .onEnded { _ in
-                        let open = drag > 80 || (menuOpen && drag > -80)
-                        withAnimation(.snappy) { menuOpen = open; drag = 0 }
-                        if open { composerFocused = false }
-                    }
-            )
+            .gesture(DrawerPan(changed: { drag = $0 }) { x, velocity in
+                // Project the fling so a quick flick opens or closes it, like ChatGPT's.
+                let projected = x + velocity * 0.2
+                let open = menuOpen ? projected > -80 : projected > 80
+                withAnimation(.snappy) { menuOpen = open; drag = 0 }
+                if open { composerFocused = false }
+            })
             .sensoryFeedback(.impact(weight: .light), trigger: menuOpen)
             // Distinct from the chat's systemBackground so the panels separate in dark mode,
             // where the shadow is invisible.
@@ -472,19 +464,45 @@ private struct ChatRow: View {
     }
 }
 
-/// Where the step carousels are on screen, so the drawer swipe can leave them alone.
-/// A class so scrolling (which moves them) doesn't re-render the whole chat. Carousels write
-/// into it through the environment: a preference wouldn't make it out of the NavigationStack.
-private final class CarouselFrames { var frames: [ChatEntry.ID: CGRect] = [:] }
+/// The drawer swipe, in UIKit because a SwiftUI DragGesture can't yield to scroll views:
+/// it starts only on a mostly horizontal swipe, runs alongside vertical scrolling, and lets
+/// a sideways scroll view under the finger (a step carousel) take the swipe instead.
+private struct DrawerPan: UIGestureRecognizerRepresentable {
+    let changed: (CGFloat) -> Void
+    let ended: (_ x: CGFloat, _ velocity: CGFloat) -> Void
 
-private struct CarouselFramesEnvironmentKey: EnvironmentKey {
-    static let defaultValue = CarouselFrames()
-}
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
 
-private extension EnvironmentValues {
-    var carouselFrames: CarouselFrames {
-        get { self[CarouselFramesEnvironmentKey.self] }
-        set { self[CarouselFramesEnvironmentKey.self] = newValue }
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
+        let x = pan.translation(in: pan.view).x
+        switch pan.state {
+        case .began, .changed: changed(x)
+        case .ended, .cancelled: ended(x, pan.velocity(in: pan.view).x)
+        default: break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+            guard let pan = g as? UIPanGestureRecognizer else { return true }
+            let v = pan.velocity(in: pan.view)
+            return abs(v.x) > abs(v.y)
+        }
+
+        func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            true
+        }
+
+        func gestureRecognizer(_ g: UIGestureRecognizer, shouldRequireFailureOf other: UIGestureRecognizer) -> Bool {
+            guard let scroll = other.view as? UIScrollView, other === scroll.panGestureRecognizer else { return false }
+            return scroll.contentSize.width > scroll.bounds.width + 1
+        }
     }
 }
 
@@ -492,7 +510,6 @@ private extension EnvironmentValues {
 private struct StepCarousel: View {
     let steps: [ChatEntry]
     @State private var viewing: ChatEntry.ID?
-    @Environment(\.carouselFrames) private var carousels
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -507,8 +524,6 @@ private struct StepCarousel: View {
                     .padding(.vertical, 4)
                 }
                 .padding(.horizontal, -16) // bleed to the screen edges
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { carousels.frames[steps[0].id] = $0 }
-                .onDisappear { carousels.frames[steps[0].id] = nil }
                 .onAppear { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
                 .onChange(of: steps.count) {
                     withAnimation(.easeOut(duration: 0.4)) { proxy.scrollTo(steps.last?.id, anchor: .trailing) }
@@ -664,14 +679,9 @@ private struct PulsingDots: View {
 }
 
 private extension View {
-    /// Liquid Glass on iOS 26+, frosted material before. Glass sits behind the
-    /// content so it doesn't wash out solid controls (the black send button).
-    @ViewBuilder func glass(in shape: some Shape) -> some View {
-        if #available(iOS 26, *) {
-            background { Color.clear.glassEffect(.regular, in: shape) }
-        } else {
-            background(.ultraThinMaterial, in: shape)
-        }
+    /// Liquid Glass behind the content, so it doesn't wash out solid controls (the black send button).
+    func glass(in shape: some Shape) -> some View {
+        background { Color.clear.glassEffect(.regular, in: shape) }
     }
 }
 
