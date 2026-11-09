@@ -109,8 +109,7 @@ final class LLMSettings: ObservableObject {
     var config: LLMConfig? {
         guard problem == nil, let url = URL(string: baseURL + "/chat/completions") else { return nil }
         return LLMConfig(chatURL: url, apiKey: apiKey, model: model.trimmingCharacters(in: .whitespaces),
-                         maxSteps: max(1, maxSteps), systemPrompt: systemPrompt, fastTier: fastTier,
-                         noReasoning: provider == .openRouter)
+                         maxSteps: max(1, maxSteps), systemPrompt: systemPrompt, fastTier: fastTier)
     }
 
     /// Checks the key against the endpoint. OpenRouter's /key rejects bad keys; /models is public there.

@@ -46,15 +46,15 @@ destination, pick a ride, stop before paying; write a note) against each model t
 
 | Model | Correct | Median | p90 | $ / decision |
 |---|---|---|---|---|
-| **Claude Haiku 5.5, reasoning off (default)** | 91% | 1.1 s | 1.5 s | $0.0003 |
-| Claude Haiku 5.5 | 91% | 1.3 s | 2.0 s | $0.0003 |
+| **Claude Haiku 5.5 (default)** | 91% | 1.3 s | 2.0 s | $0.0003 |
+| Claude Haiku 5.5, reasoning off | 91% | 1.1 s | 1.5 s | $0.0003 |
 | Claude Sonnet 5.5 (reasoning can't be turned off) | 91% | 1.2 s | 2.5 s | $0.0055 |
 | Claude Opus 5 | 95% | 2.1 s | 4.2 s | $0.014 |
 | Claude Opus 5, fast tier, reasoning off | 100% | 1.4 s | 1.6 s | $0.051 |
 | Claude Opus 5.5 | 86% | 1.8 s | 3.1 s | $0.011 |
 | Claude Opus 5.5, fast tier | 82% | 0.9 s | 1.3 s | $0.021 |
 
-- Turning reasoning off saves ~0.2–0.5 s per step at the same accuracy; the app does it for every OpenRouter model that allows it.
+- Turning reasoning off saved ~0.2–0.5 s per step at the same accuracy here; the app keeps it on (`+nothink` in `scripts/eval.sh` to compare).
 - The fast tier ("Use ultrafast if available" in Settings) is only offered for Opus 5 and 5.5, at 2–4× the price.
 - The prompt is ~1.7k tokens: system prompt, task, the last 2 screenshots (450 px wide JPEG, ~330 tokens each).
   Apps are opened by name and matched on the phone, so the installed-app list is never sent. Prompt caching and
