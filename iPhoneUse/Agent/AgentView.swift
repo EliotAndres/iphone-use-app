@@ -87,6 +87,7 @@ struct AgentView: View {
             // Test hooks: `devicectl device process launch ... -agentScript "..."` (no LLM, see
             // scripts/runscript.sh) or `-agentPrompt "..."` (real run).
             let launchArgs = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            if launchArgs["xctestProbe"] != nil { return XCTestProbe.run() }
             guard !agent.isRunning, agent.log.isEmpty else { return }
             if let script = launchArgs["agentScript"] as? String {
                 agent.runScript(script)
