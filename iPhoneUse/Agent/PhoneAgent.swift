@@ -327,8 +327,10 @@ final class PhoneAgent: ObservableObject {
             if Task.isCancelled { return "stopped" }
             let t0 = Date()
             let image: (data: Data, size: CGSize)
+            let raw: Data
             do {
-                image = try Self.shrink(device.agentScreenshot(jpeg: false))
+                raw = try device.agentScreenshot(jpeg: false)
+                image = try Self.shrink(raw)
             } catch {
                 return "error: screenshot failed: \(error.localizedDescription)"
             }
@@ -340,16 +342,34 @@ final class PhoneAgent: ObservableObject {
                 ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + image.data.base64EncodedString()]],
             ]])
 
-            let reply: [String: Any]
+            var reply: [String: Any]
+            var timing = ""
             do {
-                reply = try await Jev.handles(config.model)
-                    ? Jev.decide(task: prompt, messages: messages, image: image, apps: apps, config: config)
-                    : Self.complete(messages: messages, config: config)
+                if Jev.handles(config.model) {
+                    let tOCR = Date()
+                    let screenText = (try? ScreenText.read(raw)) ?? []
+                    let tJev = Date()
+                    reply = try await Jev.decide(task: prompt, messages: messages, image: image,
+                                                 screenText: screenText, apps: apps, config: config)
+                    timing = String(format: "ocr %.2fs (%d lines), jev %.2fs", tJev.timeIntervalSince(tOCR),
+                                    screenText.count, Date().timeIntervalSince(tJev))
+                    if let reason = reply["handover"] as? String {
+                        let tLLM = Date()
+                        var fallback = config
+                        fallback.model = Jev.handoverModel
+                        reply = try await Self.complete(messages: messages, config: fallback)
+                        reply["content"] = "[\(reason), \(Jev.handoverModel) took over] " + (reply["content"] as? String ?? "")
+                        timing += String(format: ", llm %.1fs", Date().timeIntervalSince(tLLM))
+                    }
+                } else {
+                    reply = try await Self.complete(messages: messages, config: config)
+                }
             } catch {
                 if Task.isCancelled { return "stopped" }
                 return "error: LLM: \(error.localizedDescription)"
             }
             let tLLM = Date().timeIntervalSince(t0) - tShot
+            if timing.isEmpty { timing = String(format: "llm %.1fs", tLLM) }
             messages.append(reply)
 
             guard let call = (reply["tool_calls"] as? [[String: Any]])?.first,
@@ -363,7 +383,7 @@ final class PhoneAgent: ObservableObject {
             let args = (function["arguments"] as? String)
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]
             let thought = (reply["content"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            await say(String(format: "%d %@ %@  (shot %.1fs, llm %.1fs)", step, name, Self.compact(args), tShot, tLLM), step: step,
+            await say(String(format: "%d %@ %@  (shot %.1fs, %@)", step, name, Self.compact(args), tShot, timing), step: step,
                       text: "\(step). \(name) \(Self.compact(args))", thought: thought, image: image.data)
 
             if name == "done" {
