@@ -31,9 +31,9 @@ struct LLMConfig: Sendable {
 final class LLMSettings: ObservableObject {
     static let shared = LLMSettings()
     static let openRouterURL = "https://openrouter.ai/api/v1"
-    static let defaultModel = "anthropic/claude-sonnet-5.5"
+    static let defaultModel = "anthropic/claude-haiku-5.5"
     /// The "Use …" buttons under the model row.
-    static let quickModels = [(name: "Sonnet", id: "anthropic/claude-sonnet-5.5"), (name: "Haiku", id: "anthropic/claude-haiku-5.5")]
+    static let quickModels = [(name: "Haiku", id: "anthropic/claude-haiku-5.5"), (name: "Sonnet", id: "anthropic/claude-sonnet-5.5")]
     /// Fast OpenRouter transcription models, first is the default.
     static let voiceModels = [
         "openai/whisper-large-v3-turbo",
@@ -109,7 +109,8 @@ final class LLMSettings: ObservableObject {
     var config: LLMConfig? {
         guard problem == nil, let url = URL(string: baseURL + "/chat/completions") else { return nil }
         return LLMConfig(chatURL: url, apiKey: apiKey, model: model.trimmingCharacters(in: .whitespaces),
-                         maxSteps: max(1, maxSteps), systemPrompt: systemPrompt, fastTier: fastTier)
+                         maxSteps: max(1, maxSteps), systemPrompt: systemPrompt, fastTier: fastTier,
+                         noReasoning: provider == .openRouter)
     }
 
     /// Checks the key against the endpoint. OpenRouter's /key rejects bad keys; /models is public there.

@@ -38,6 +38,31 @@ types the destination, picks it and stops at the ride options. Middle: the finis
 | **Price / license** | Free, AGPL-3.0 (bring a model key) | $49/month per phone | Free, MIT (firmware GPL-3.0) | Free, MIT |
 | **iOS** | 26+ | n/a | 18+ | What your Xcode supports |
 
+## Benchmark
+
+One decision is one screenshot → one tool call. `scripts/eval.sh` replays 11 recorded steps (open Lyft, search a
+destination, pick a ride, stop before paying; write a note) against each model through OpenRouter, run twice
+(22 decisions per row). November 2026; times are full round trips from a Mac.
+
+| Model | Correct | Median | p90 | $ / decision |
+|---|---|---|---|---|
+| **Claude Haiku 5.5, reasoning off (default)** | 91% | 1.1 s | 1.5 s | $0.0003 |
+| Claude Haiku 5.5 | 91% | 1.3 s | 2.0 s | $0.0003 |
+| Claude Sonnet 5.5 (reasoning can't be turned off) | 91% | 1.2 s | 2.5 s | $0.0055 |
+| Claude Opus 5 | 95% | 2.1 s | 4.2 s | $0.014 |
+| Claude Opus 5, fast tier, reasoning off | 100% | 1.4 s | 1.6 s | $0.051 |
+| Claude Opus 5.5 | 86% | 1.8 s | 3.1 s | $0.011 |
+| Claude Opus 5.5, fast tier | 82% | 0.9 s | 1.3 s | $0.021 |
+
+- Turning reasoning off saves ~0.2–0.5 s per step at the same accuracy; the app does it for every OpenRouter model that allows it.
+- The fast tier ("Use ultrafast if available" in Settings) is only offered for Opus 5 and 5.5, at 2–4× the price.
+- The prompt is ~1.7k tokens: system prompt, task, the last 2 screenshots (450 px wide JPEG, ~330 tokens each).
+  Apps are opened by name and matched on the phone, so the installed-app list is never sent. Prompt caching and
+  smaller screenshots didn't measurably change latency; time to first token dominates.
+- Opus 5.5's misses are replies with no tool call; the app answers those with "Call exactly one tool." and retries,
+  costing a step. Forcing a tool call isn't allowed together with reasoning on these models.
+- A small sample: one case is ~4.5 points. Add cases under `evals/cases/` (a screenshot + the expected action).
+
 ## Requirements
 
 | Part | Notes |

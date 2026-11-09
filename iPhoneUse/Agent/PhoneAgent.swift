@@ -29,6 +29,7 @@ struct ChatEntry: Identifiable, Codable {
     let text: String
     var thought: String? // a step's reasoning
     var shot: Bool? // a step's screenshot is at `shotURL`
+    var touches: [CGPoint]? // where a tap / long press / swipe landed, as fractions of the screenshot
 
     static let shotsURL = URL.documentsDirectory.appending(path: "shots")
     var shotURL: URL { Self.shotsURL.appending(path: "\(id).jpg") }
@@ -281,10 +282,11 @@ final class PhoneAgent: ObservableObject {
     /// Appends to the chat (as `text`, defaulting to `line`), the log and the Live Activity.
     /// A step can carry its reasoning and its screenshot (JPEG), shown together in the carousel.
     nonisolated private func say(_ line: String, step: Int? = nil, as kind: ChatEntry.Kind = .step, text: String? = nil,
-                                 thought: String? = nil, image: Data? = nil) async {
+                                 thought: String? = nil, image: Data? = nil, touches: [CGPoint]? = nil) async {
         let time = Date().formatted(date: .omitted, time: .standard)
         let stamped = (thought.map { "\(time) · \($0)\n" } ?? "") + "\(time) \(line)\n"
         var entry = ChatEntry(kind: kind, text: text ?? line, thought: thought)
+        entry.touches = touches
         if let image {
             try? FileManager.default.createDirectory(at: ChatEntry.shotsURL, withIntermediateDirectories: true)
             entry.shot = (try? image.write(to: entry.shotURL)) != nil
@@ -349,8 +351,13 @@ final class PhoneAgent: ObservableObject {
             let args = (function["arguments"] as? String)
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]
             let thought = (reply["content"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let keys = ["tap": ["x", "y"], "long_press": ["x", "y"], "swipe": ["x1", "y1", "x2", "y2"]][name] ?? []
+            let touches = stride(from: 0, to: keys.count, by: 2).map {
+                CGPoint(x: Self.num(args[keys[$0]]) / image.size.width, y: Self.num(args[keys[$0 + 1]]) / image.size.height)
+            }
             await say(String(format: "%d %@ %@  (shot %.1fs, %@)", step, name, Self.compact(args), tShot, timing), step: step,
-                      text: "\(step). \(name) \(Self.compact(args))", thought: thought, image: image.data)
+                      text: "\(step). \(name) \(Self.compact(args))", thought: thought, image: image.data,
+                      touches: touches.isEmpty ? nil : touches)
 
             if name == "done" {
                 try? device.agentLaunch(bundleID: Bundle.main.bundleIdentifier ?? "")

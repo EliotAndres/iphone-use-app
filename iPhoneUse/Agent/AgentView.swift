@@ -585,6 +585,7 @@ private struct ShotViewer: View {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFit()
+                                .overlay { TouchMarks(touches: shot.touches, size: 34) }
                                 .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
                                 .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
@@ -631,6 +632,7 @@ private struct StepCard: View {
                     if let image { Image(uiImage: image).resizable() } else { Color(.secondarySystemFill) }
                 }
                 .aspectRatio(9 / 19.5, contentMode: .fit)
+                .overlay { TouchMarks(touches: entry.touches, size: 16) }
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
                 .onTapGesture { tapHaptic(); open() }
@@ -649,6 +651,29 @@ private struct StepCard: View {
         .scaleEffect(shown ? 1 : 0.95)
         .onAppear { withAnimation(.easeOut(duration: 0.45)) { shown = true } }
         .task { if entry.shot == true { image = UIImage(contentsOfFile: entry.shotURL.path) } }
+    }
+}
+
+/// Where a step touched the screen: a ring per point, joined by a line for a swipe.
+private struct TouchMarks: View {
+    let touches: [CGPoint]?
+    let size: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            let points = (touches ?? []).map { CGPoint(x: $0.x * geo.size.width, y: $0.y * geo.size.height) }
+            if points.count > 1 {
+                Path { $0.addLines(points) }.stroke(.red, style: StrokeStyle(lineWidth: size / 6, lineCap: .round))
+            }
+            ForEach(points.indices, id: \.self) { i in
+                Circle()
+                    .fill(.red.opacity(0.3))
+                    .stroke(.red, lineWidth: size / 8)
+                    .frame(width: size, height: size)
+                    .position(points[i])
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 

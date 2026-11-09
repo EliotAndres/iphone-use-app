@@ -26,6 +26,7 @@ enum Decide {
     /// OpenRouter cost of every request so far, in USD, from each response's `usage.cost`.
     // ponytail: unsynchronized global, fine while decisions run one at a time; per-call results if they go parallel.
     nonisolated(unsafe) static var spent = 0.0
+    nonisolated(unsafe) static var reasoningRequired: Set<String> = []
 
     /// The conversation a run starts with. The installed apps are not listed (706 apps were ~13k
     /// tokens a step); `open_app` takes a name and `appBundleID` resolves it on the phone.
@@ -120,12 +121,18 @@ enum Decide {
         // Faster, pricier serving where the model has it (e.g. Claude Opus 5); ignored elsewhere.
         if config.fastTier { body["service_tier"] = "fast" }
         // Reasoning models think before each tool call; off is faster (see README "Benchmark").
-        if config.noReasoning { body["reasoning"] = ["effort": "none"] }
+        // Some (e.g. Sonnet 5.5) refuse to turn it off: retry with it on and remember the model.
+        let noReasoning = config.noReasoning && !reasoningRequired.contains(config.model)
+        if noReasoning { body["reasoning"] = ["effort": "none"] }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         guard let message = ((json?["choices"] as? [[String: Any]])?.first?["message"]) as? [String: Any] else {
             let body = String(data: data, encoding: .utf8) ?? ""
+            if noReasoning && body.contains("Reasoning is mandatory") {
+                reasoningRequired.insert(config.model)
+                return try await complete(messages: messages, config: config)
+            }
             throw NSError(domain: "agent", code: (response as? HTTPURLResponse)?.statusCode ?? 0,
                           userInfo: [NSLocalizedDescriptionKey: String(body.prefix(400))])
         }
