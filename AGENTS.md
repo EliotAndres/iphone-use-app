@@ -11,7 +11,7 @@ extension, based on LocalDevVPN/StosVPN) + an RP pairing file, using the Rust li
 
 ## Layout
 
-- `iPhoneUse/Agent/`: the ChatGPT-style chat screen + chat list drawer (`AgentView`), loop + history (`PhoneAgent`), `LLMSettings` (provider, Keychain key, model), `RunAgentIntent`
+- `iPhoneUse/Agent/`: the ChatGPT-style chat screen + chat list drawer (`AgentView`), loop + history (`PhoneAgent`), one step screenshot -> tool call (`Decide`, no UIKit/device code, shared with the eval), `Jev` + `ScreenText` (OCR), `LLMSettings` (provider, Keychain key, model), `RunAgentIntent`
 - `iPhoneUse/Settings/`: Settings (a sheet from the chat's gear), model picker
 - `iPhoneUse/Device/`: `Connection` (VPN -> tunnel -> DDI), `DeviceSession` (tunnel, heartbeat), `DeviceSession+Services.swift` (apps, DDI, `agentScreenshot/Touch/Home/Type/Launch`)
 - `TunnelProvider/`: loopback packet-tunnel extension
@@ -38,6 +38,14 @@ add an API key in Settings. The DDI downloads and mounts on its own.
 `DEV=<udid> scripts/runscript.sh "open com.apple.Preferences; wait 1.5; tap 0.5 0.9; shot a" a`
 launches the app with `-agentScript`, waits for "script done" in `Documents/agent.log`, and pulls the screenshots.
 `-agentPrompt "..."` as a launch argument starts a real LLM run.
+
+## Offline eval (Mac, no phone)
+
+`scripts/eval.sh [model ...]` (default Jev + Claude Haiku) compiles `Decide/Jev/ScreenText/LLMSettings` with
+`evals/Eval.swift` via `swiftc`, makes one decision per `evals/cases/<case>/` (`screenshot.png|jpg`, full-res,
++ `case.json`: task, optional history of prior tool calls in 450-px coords, acceptable `expected` actions with
+normalized tap rects) and prints accuracy / latency / handover / cost per model; rows go to `.build/evals/results.csv`.
+`CASES=a,b` runs a subset. Reads `OPEN_ROUTER` from `~/.credentials` unless `OPENROUTER_API_KEY` is set.
 
 ## Decisions
 

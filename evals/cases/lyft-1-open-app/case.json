@@ -1,0 +1,9 @@
+{
+  "task": "Select a Lyft to the Eiffel Tower (don't book yet)",
+  "expected": [
+    {
+      "action": "open_app",
+      "bundle_id": "com.zimride.instant"
+    }
+  ]
+}

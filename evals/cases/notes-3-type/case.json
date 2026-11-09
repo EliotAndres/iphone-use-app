@@ -1,0 +1,25 @@
+{
+  "task": "Open notes, write \"hello world\"",
+  "history": [
+    {
+      "name": "open_app",
+      "args": {
+        "bundle_id": "com.apple.mobilenotes"
+      }
+    },
+    {
+      "name": "tap",
+      "args": {
+        "x": 391,
+        "y": 919
+      },
+      "thought": "Tap the new note button."
+    }
+  ],
+  "expected": [
+    {
+      "action": "type",
+      "text": "hello world"
+    }
+  ]
+}

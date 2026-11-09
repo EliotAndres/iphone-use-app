@@ -1,0 +1,25 @@
+{
+  "task": "Select a Lyft to the Eiffel Tower (don't book yet)",
+  "history": [
+    {
+      "name": "open_app",
+      "args": {
+        "bundle_id": "com.zimride.instant"
+      }
+    },
+    {
+      "name": "tap",
+      "args": {
+        "x": 225,
+        "y": 243
+      },
+      "thought": "Tap the search field."
+    }
+  ],
+  "expected": [
+    {
+      "action": "type",
+      "text": "Eiffel Tower"
+    }
+  ]
+}

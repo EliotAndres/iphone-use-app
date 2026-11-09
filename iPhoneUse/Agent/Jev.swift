@@ -6,7 +6,7 @@
 //  typed questions (choice, box) about a state. Each step asks which action, which on-screen
 //  text (from on-device OCR) or box, which text from the task and which app, then returns a
 //  reply shaped like a chat tool call so the agent loop doesn't care which model it talks to.
-//  When Jev is unsure, PhoneAgent hands that step to a chat model (`handoverModel`).
+//  When Jev is unsure, Decide.next hands that step to a chat model (`handoverModel`).
 //  API: https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-request.md
 //
 
@@ -186,7 +186,9 @@ enum Jev {
             "model": config.model, "state": state, "questions": questions,
         ] as [String: Any])
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let answers = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["answers"] as? [String: [String: Any]] else {
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        Decide.spent += (json?["usage"] as? [String: Any])?["cost"] as? Double ?? 0
+        guard let answers = json?["answers"] as? [String: [String: Any]] else {
             throw NSError(domain: "jev", code: (response as? HTTPURLResponse)?.statusCode ?? 0,
                           userInfo: [NSLocalizedDescriptionKey: String((String(data: data, encoding: .utf8) ?? "").prefix(400))])
         }
