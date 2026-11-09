@@ -205,6 +205,21 @@ private struct LLMSettingsView: View {
                 SecureField("API key", text: $settings.apiKey,
                             prompt: Text(settings.provider == .custom ? "API key (optional)" : "API key"))
                 ModelPicker(settings: settings)
+                if settings.provider == .openRouter {
+                    ForEach(LLMSettings.recommendedModels, id: \.id) { model in
+                        Button { settings.model = model.id } label: {
+                            LabeledContent(model.name) {
+                                if settings.model == model.id {
+                                    Image(systemName: "checkmark").accessibilityLabel("Selected")
+                                } else {
+                                    Text("Recommended")
+                                }
+                            }
+                            .contentShape(.rect)
+                        }
+                        .buttonStyle(.haptic(.plain))
+                    }
+                }
             } footer: {
                 if settings.provider == .openRouter {
                     Link("Get an OpenRouter key", destination: Links.openRouterKeys)

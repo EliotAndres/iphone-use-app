@@ -28,7 +28,13 @@ struct LLMConfig: Sendable {
 final class LLMSettings: ObservableObject {
     static let shared = LLMSettings()
     static let openRouterURL = "https://openrouter.ai/api/v1"
-    static let defaultModel = "anthropic/claude-sonnet-5.5"
+    static let defaultModel = Jev.model
+    /// Shown under the model row for OpenRouter.
+    static let recommendedModels = [
+        (name: "Jev", id: Jev.model),
+        (name: "Claude Sonnet", id: "anthropic/claude-sonnet-5.5"),
+        (name: "Claude Haiku", id: "anthropic/claude-haiku-5.5"),
+    ]
     /// Fast OpenRouter transcription models, first is the default.
     static let voiceModels = [
         "openai/whisper-large-v3-turbo",

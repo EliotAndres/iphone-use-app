@@ -39,26 +39,16 @@ enum Jev {
             "You operate this iPhone for its owner. The image is the current screen.\nTask: \(task)\n"
                 + "Actions taken so far:\n" + (done.isEmpty ? "none" : done.joined(separator: "\n")),
         ]
-        let questions: [String: Any] = [
+        var questions: [String: Any] = [
             "action": ["type": "choice", "instructions": "Which single next action best moves toward the task?",
                        "criteria": actions],
             "target": ["type": "box", "instructions": "The element on the screen to act on next (for tap or long_press)."],
-            "app": ["type": "choice", "instructions": "Which installed app is most useful for the task?",
-                    "criteria": apps.isEmpty ? ["none": "no apps"] : apps], // bundle id: name
         ]
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 90
-        request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "model": config.model, "state": state, "questions": questions,
-        ] as [String: Any])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let answers = (try JSONSerialization.jsonObject(with: data) as? [String: Any])?["answers"] as? [String: [String: Any]]
-        guard let answers, let action = answers["action"]?["choice"] as? String else {
-            throw NSError(domain: "jev", code: (response as? HTTPURLResponse)?.statusCode ?? 0,
-                          userInfo: [NSLocalizedDescriptionKey: String((String(data: data, encoding: .utf8) ?? "").prefix(400))])
+        // A choice takes at most 255 options: with more apps, pick one only when the action is open_app.
+        if apps.count <= maxChoices { questions["app"] = appQuestion(apps) }
+        let answers = try await ask(state: state, questions: questions, config: config)
+        guard let action = answers["action"]?["choice"] as? String else {
+            throw NSError(domain: "jev", code: 0, userInfo: [NSLocalizedDescriptionKey: "No action in Jev's answer."])
         }
         let box = answers["target"]?["box"] as? [String: Double] ?? [:]
         let x = ((box["left"] ?? 0.5) + (box["right"] ?? 0.5)) / 2 * image.size.width
@@ -71,7 +61,10 @@ enum Jev {
         case "tap", "long_press": (name, args) = (action, ["x": Int(x), "y": Int(y)])
         case "scroll_down": (name, args) = ("swipe", ["x1": Int(w / 2), "y1": Int(h * 0.7), "x2": Int(w / 2), "y2": Int(h * 0.3)])
         case "scroll_up": (name, args) = ("swipe", ["x1": Int(w / 2), "y1": Int(h * 0.3), "x2": Int(w / 2), "y2": Int(h * 0.7)])
-        case "open_app": (name, args) = ("open_app", ["bundle_id": answers["app"]?["choice"] as? String ?? ""])
+        case "open_app":
+            var app = answers["app"]?["choice"] as? String
+            if app == nil { app = try await pickApp(apps, state: state, config: config) }
+            (name, args) = ("open_app", ["bundle_id": app ?? ""])
         case "done": (name, args) = ("done", ["summary": "Jev considers the task done."])
         case "type":
             // Jev can't write text: ask the owner, then type their answer the next time it picks `type`.
@@ -92,5 +85,44 @@ enum Jev {
             "content": String(format: "%@ (%.0f%% sure)", action, confidence * 100),
             "tool_calls": [["id": UUID().uuidString, "type": "function", "function": ["name": name, "arguments": arguments]]],
         ]
+    }
+
+    static let maxChoices = 255
+
+    private static func appQuestion(_ apps: [String: String]) -> [String: Any] {
+        ["type": "choice", "instructions": "Which installed app is most useful for the task?",
+         "criteria": apps.isEmpty ? ["none": "no apps"] : apps] // bundle id: name
+    }
+
+    /// Picks an app from more than `maxChoices`: the best of each batch, then the best of those.
+    private static func pickApp(_ apps: [String: String], state: [Any], config: LLMConfig) async throws -> String {
+        if apps.count <= maxChoices {
+            return try await ask(state: state, questions: ["app": appQuestion(apps)], config: config)["app"]?["choice"] as? String ?? ""
+        }
+        let ids = apps.keys.sorted()
+        var winners: [String: String] = [:]
+        for start in stride(from: 0, to: ids.count, by: maxChoices) {
+            let batch = ids[start..<min(start + maxChoices, ids.count)]
+            let id = try await pickApp(Dictionary(uniqueKeysWithValues: batch.map { ($0, apps[$0]!) }), state: state, config: config)
+            if let name = apps[id] { winners[id] = name }
+        }
+        return try await pickApp(winners, state: state, config: config)
+    }
+
+    private static func ask(state: [Any], questions: [String: Any], config: LLMConfig) async throws -> [String: [String: Any]] {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 90
+        request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "model": config.model, "state": state, "questions": questions,
+        ] as [String: Any])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let answers = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["answers"] as? [String: [String: Any]] else {
+            throw NSError(domain: "jev", code: (response as? HTTPURLResponse)?.statusCode ?? 0,
+                          userInfo: [NSLocalizedDescriptionKey: String((String(data: data, encoding: .utf8) ?? "").prefix(400))])
+        }
+        return answers
     }
 }
