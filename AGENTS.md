@@ -13,10 +13,10 @@ extension, based on LocalDevVPN/StosVPN) + an RP pairing file, using the Rust li
 
 - `iPhoneUse/Agent/`: the ChatGPT-style chat screen + chat list drawer (`AgentView`), loop + history (`PhoneAgent`), `LLMSettings` (provider, Keychain key, model), `RunAgentIntent`
 - `iPhoneUse/Settings/`: Settings (a sheet from the chat's gear), model picker
-- `iPhoneUse/Device/`: `Connection` (VPN -> tunnel -> DDI), `DeviceSession` (tunnel, heartbeat), `DeviceSession+Services.swift` (apps, DDI, `agentScreenshot/Touch/Home/Type/Launch`)
+- `iPhoneUse/Device/`: `Connection` (VPN -> tunnel -> DDI), `DeviceSession` (tunnel, heartbeat), `DeviceSession+Services.swift` (apps, DDI, `agentScreenshot/Touch/Home/Type/Launch`), `LiveScreen` (live screen video during a run)
 - `TunnelProvider/`: loopback packet-tunnel extension
 - `AgentWidget/`: Live Activity; `Shared/`: files compiled into both app and widget (`StopAgentIntent` uses `#if WIDGET`)
-- `idevice-patch/`: our additions to idevice's FFI (`probe.rs`: screenshot, touch, buttons, keyboard)
+- `idevice-patch/`: our additions to idevice's FFI (`probe.rs`: screenshot, live stream, touch, buttons, keyboard)
 
 ## Build
 

@@ -2,18 +2,21 @@
 // its own phone. Each call opens a fresh service connection on the existing
 // tunnel: the capture service drops its connection after a shot or two.
 // iOS 27 drops HID input unless a DisplayService media stream is open, so on
-// 27 every touch/button/type call brackets itself with one (see `open_gate`).
+// 27 every touch/button/type call brackets itself with one (see `open_gate`),
+// unless the live stream (`probe_stream_start`) already holds it open.
 
 use std::ptr::null_mut;
 use std::time::Duration;
 
 use idevice::core_device::hid::{ButtonState, IndigoHidClient, UniversalHidServiceClient};
 use idevice::core_device::{
-    CallInfoBlob, DisplayServiceClient, ImageFormat, ScreenCaptureServiceClient, build_screen_audio_offer,
-    build_screen_video_offer, build_start_audio_parameters, build_start_video_parameters,
+    CallInfoBlob, DisplayServiceClient, HevcDepacketizer, ImageFormat, RtpPacket, ScreenCaptureServiceClient,
+    build_screen_audio_offer, build_screen_video_offer, build_start_audio_parameters, build_start_video_parameters,
+    rtcp::{build_keyframe_request, is_rtcp},
 };
 use idevice::tcp::handle::UdpSocketHandle;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::{Mutex, mpsc};
 use idevice::{IdeviceError, RsdService as _};
 
 use crate::{IdeviceFfiError, core_device_proxy::AdapterHandle, ffi_err, rsd::RsdHandshakeHandle, run_sync_local};
@@ -216,49 +219,58 @@ fn ascii_to_usage(c: char) -> Option<(u64, bool)> {
 /// 0 = not tried yet, 1 = device needs the stream (iOS 27+), 2 = it refuses one (older iOS).
 static GATE_MODE: AtomicU8 = AtomicU8::new(0);
 
-type Gate = Option<(DisplayServiceClient<Box<dyn idevice::ReadWrite>>, UdpSocketHandle, UdpSocketHandle)>;
+type Gate = Option<Stream>;
 
-/// Starts the audio+video screen-sharing session that holds backboardd's HID
-/// auth gate open. Mirrors tools/src/coredevice_stream.rs; the RTP is never read.
+type Stream = (DisplayServiceClient<Box<dyn idevice::ReadWrite>>, UdpSocketHandle, UdpSocketHandle);
+
+/// Starts the audio+video screen-sharing session (HEVC over plain RTP to the
+/// returned video socket). Mirrors tools/src/coredevice_stream.rs.
+/// `ssrc` is ours in the offer; RTCP we send must carry it.
+async fn start_stream(
+    adapter: &mut idevice::tcp::handle::AdapterHandle,
+    handshake: &mut idevice::rsd::RsdHandshake,
+    ssrc: u32,
+) -> Result<Stream, IdeviceError> {
+    let mut client = DisplayServiceClient::connect_rsd(adapter, handshake).await?;
+    let audio_udp = adapter.bind_udp(0).await?;
+    let video_udp = adapter.bind_udp(0).await?;
+    let (host, peer) = (adapter.host_ip().to_string(), adapter.peer_ip().to_string());
+    let call_info = CallInfoBlob {
+        call_id: 0,
+        client_version: 1,
+        device_type: "Mac17,7".into(),
+        framework_version: "2205.3.1".into(),
+        os_version: "25F71".into(),
+        device_name: None,
+        audio_device_uid: None,
+    };
+    let session = uuid::Uuid::new_v4();
+    let call_id = || uuid::Uuid::new_v4().to_string().to_uppercase();
+    let audio_offer = build_screen_audio_offer(&call_id(), &call_info)?;
+    client
+        .start_media_stream(build_start_audio_parameters(
+            &host, audio_udp.local_port(), &peer, 50000, audio_offer, 140, session,
+        ))
+        .await?;
+    let video_offer = build_screen_video_offer(&call_id(), &call_info, ssrc)?;
+    client
+        .start_media_stream(build_start_video_parameters(
+            &host, video_udp.local_port(), &peer, 50001, video_offer, 140, 1, session,
+        ))
+        .await?;
+    Ok((client, audio_udp, video_udp))
+}
+
+/// Opens a stream just to hold backboardd's HID auth gate open; the RTP is never read.
+/// None when the live stream already holds it, or on iOS that doesn't need it.
 async fn open_gate(
     adapter: &mut idevice::tcp::handle::AdapterHandle,
     handshake: &mut idevice::rsd::RsdHandshake,
 ) -> Gate {
-    if GATE_MODE.load(Ordering::Relaxed) == 2 {
+    if LIVE_ON.load(Ordering::Relaxed) || GATE_MODE.load(Ordering::Relaxed) == 2 {
         return None;
     }
-    let res: Result<_, IdeviceError> = async {
-        let mut client = DisplayServiceClient::connect_rsd(adapter, handshake).await?;
-        let audio_udp = adapter.bind_udp(0).await?;
-        let video_udp = adapter.bind_udp(0).await?;
-        let (host, peer) = (adapter.host_ip().to_string(), adapter.peer_ip().to_string());
-        let call_info = CallInfoBlob {
-            call_id: 0,
-            client_version: 1,
-            device_type: "Mac17,7".into(),
-            framework_version: "2205.3.1".into(),
-            os_version: "25F71".into(),
-            device_name: None,
-            audio_device_uid: None,
-        };
-        let session = uuid::Uuid::new_v4();
-        let call_id = || uuid::Uuid::new_v4().to_string().to_uppercase();
-        let audio_offer = build_screen_audio_offer(&call_id(), &call_info)?;
-        client
-            .start_media_stream(build_start_audio_parameters(
-                &host, audio_udp.local_port(), &peer, 50000, audio_offer, 140, session,
-            ))
-            .await?;
-        let video_offer = build_screen_video_offer(&call_id(), &call_info, uuid::Uuid::new_v4().as_u128() as u32)?;
-        client
-            .start_media_stream(build_start_video_parameters(
-                &host, video_udp.local_port(), &peer, 50001, video_offer, 140, 1, session,
-            ))
-            .await?;
-        Ok((client, audio_udp, video_udp))
-    }
-    .await;
-    match res {
+    match start_stream(adapter, handshake, uuid::Uuid::new_v4().as_u128() as u32).await {
         Ok(gate) => {
             GATE_MODE.store(1, Ordering::Relaxed);
             // backboardd needs a moment to re-match HID surfaces to the stream.
@@ -280,4 +292,117 @@ async fn close_gate(gate: Gate) {
     if let Some((mut client, _audio, _video)) = gate {
         let _ = client.stop_media_stream().await;
     }
+}
+
+// Live screen: the stream stays open for a whole run; a task depacketizes the
+// HEVC and queues one Annex-B access unit (frame) at a time for the app to decode.
+static LIVE_ON: AtomicBool = AtomicBool::new(false);
+static KEYFRAME: AtomicBool = AtomicBool::new(false);
+static LIVE: Mutex<Option<(DisplayServiceClient<Box<dyn idevice::ReadWrite>>, UdpSocketHandle, tokio::task::JoinHandle<()>)>> =
+    Mutex::new(None);
+static LIVE_FRAMES: Mutex<Option<mpsc::Receiver<Vec<u8>>>> = Mutex::new(None);
+
+/// Starts the live screen stream (stops a previous one). Frames come from `probe_stream_next`.
+/// Also holds the HID gate open, so touches skip `open_gate` while it runs.
+///
+/// # Safety
+/// Handles must be valid and come from this library.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn probe_stream_start(
+    adapter: *mut AdapterHandle,
+    handshake: *mut RsdHandshakeHandle,
+) -> *mut IdeviceFfiError {
+    if adapter.is_null() || handshake.is_null() {
+        return ffi_err!(IdeviceError::FfiInvalidArg);
+    }
+    probe_stream_stop();
+    let res = run_sync_local(async move {
+        let (a, h) = unsafe { (&mut (*adapter).0, &mut (*handshake).0) };
+        let ssrc = uuid::Uuid::new_v4().as_u128() as u32;
+        let (client, audio, video) = start_stream(a, h, ssrc).await?;
+        KEYFRAME.store(false, Ordering::Relaxed);
+        let (tx, rx) = mpsc::channel();
+        let task = tokio::spawn(async move {
+            let mut depack = HevcDepacketizer::new();
+            let mut last_ts = None;
+            let mut fir_seq = 0u8;
+            // A frame ends on the RTP marker bit, or at the latest when the next timestamp starts.
+            let flush = |d: &mut HevcDepacketizer| {
+                let out = d.take_output();
+                out.is_empty() || tx.send(out).is_ok()
+            };
+            while let Ok(dg) = video.recv().await {
+                if is_rtcp(&dg.data) {
+                    continue;
+                }
+                let Some(pkt) = RtpPacket::parse(&dg.data) else { continue };
+                if KEYFRAME.swap(false, Ordering::Relaxed) {
+                    fir_seq = fir_seq.wrapping_add(1);
+                    let request = build_keyframe_request(ssrc, "iphoneuse", pkt.ssrc, &[], fir_seq);
+                    let _ = video.send_to(dg.source_port, request).await; // RTCP is muxed on the RTP port
+                }
+                if last_ts.is_some_and(|t| t != pkt.timestamp) && !flush(&mut depack) {
+                    break;
+                }
+                last_ts = Some(pkt.timestamp);
+                depack.push(pkt.sequence_number, pkt.timestamp, pkt.payload);
+                if pkt.marker && !flush(&mut depack) {
+                    break;
+                }
+            }
+        });
+        *LIVE.lock().unwrap() = Some((client, audio, task));
+        *LIVE_FRAMES.lock().unwrap() = Some(rx);
+        LIVE_ON.store(true, Ordering::Relaxed);
+        GATE_MODE.store(1, Ordering::Relaxed);
+        Ok::<(), IdeviceError>(())
+    });
+    match res {
+        Ok(()) => null_mut(),
+        Err(e) => ffi_err!(e),
+    }
+}
+
+/// Waits up to `timeout_ms` for the next frame (Annex-B HEVC, free with `idevice_data_free`).
+/// Returns 1 with a frame, 0 on timeout, -1 when no stream is running or it ended.
+///
+/// # Safety
+/// `out_data` and `out_len` must be valid pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn probe_stream_next(timeout_ms: u64, out_data: *mut *mut u8, out_len: *mut usize) -> i32 {
+    if out_data.is_null() || out_len.is_null() {
+        return -1;
+    }
+    let guard = LIVE_FRAMES.lock().unwrap();
+    let Some(rx) = guard.as_ref() else { return -1 };
+    match rx.recv_timeout(Duration::from_millis(timeout_ms)) {
+        Ok(frame) => {
+            let frame = frame.into_boxed_slice();
+            unsafe {
+                *out_len = frame.len();
+                *out_data = Box::into_raw(frame) as *mut u8;
+            }
+            1
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => 0,
+        Err(mpsc::RecvTimeoutError::Disconnected) => -1,
+    }
+}
+
+/// Stops the live stream, if any. `probe_stream_next` then returns -1.
+#[unsafe(no_mangle)]
+pub extern "C" fn probe_stream_stop() {
+    LIVE_ON.store(false, Ordering::Relaxed);
+    let Some((mut client, _audio, task)) = LIVE.lock().unwrap().take() else { return };
+    task.abort(); // drops the frame sender, so a waiting `probe_stream_next` returns -1
+    run_sync_local(async move {
+        let _ = client.stop_media_stream().await;
+    });
+}
+
+/// Asks the device for a keyframe (RTCP PLI + FIR), sent with the next packet received.
+/// The decoder needs one after it resets, since later frames only carry changes.
+#[unsafe(no_mangle)]
+pub extern "C" fn probe_stream_keyframe() {
+    KEYFRAME.store(true, Ordering::Relaxed);
 }

@@ -345,11 +345,22 @@ extension DeviceSession {
 // MARK: - Agent: CoreDevice screenshot / HID / launch on this same phone
 
 extension DeviceSession {
-    func agentScreenshot(jpeg: Bool = true) throws -> Data {
+    /// Opens the DisplayService video stream `LiveScreen` reads (see `probe_stream_start`).
+    func agentStartStream() throws {
         try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
+            if let ffiError = probe_stream_start(adapter, handshake) {
+                throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Live screen failed", domain: "agent")
+            }
+        }
+    }
+
+    /// The live stream's latest frame (JPEG) when it runs, else a CoreDevice PNG (~0.9 s; the device refuses JPEG).
+    func agentScreenshot() throws -> Data {
+        if let frame = LiveScreen.shared.jpeg() { return frame }
+        return try IdeviceBridge.withTunnelHandles(for: self) { adapter, handshake in
             var bytes: UnsafeMutablePointer<UInt8>?
             var length = UInt(0)
-            if let ffiError = probe_screenshot(adapter, handshake, jpeg ? 1 : 0, &bytes, &length) {
+            if let ffiError = probe_screenshot(adapter, handshake, 0, &bytes, &length) {
                 throw IdeviceBridge.consumeFFIError(ffiError, fallback: "Screenshot failed", domain: "agent")
             }
             guard let bytes else { throw IdeviceBridge.makeError(domain: "agent", message: "Empty screenshot") }

@@ -3095,6 +3095,36 @@ struct IdeviceFfiError *probe_type(struct AdapterHandle *adapter,
                                    const char *text);
 
 /**
+ * Starts the live screen stream (stops a previous one). Frames come from `probe_stream_next`.
+ * Also holds the HID gate open, so touches skip `open_gate` while it runs.
+ *
+ * # Safety
+ * Handles must be valid and come from this library.
+ */
+struct IdeviceFfiError *probe_stream_start(struct AdapterHandle *adapter,
+                                           struct RsdHandshakeHandle *handshake);
+
+/**
+ * Waits up to `timeout_ms` for the next frame (Annex-B HEVC, free with `idevice_data_free`).
+ * Returns 1 with a frame, 0 on timeout, -1 when no stream is running or it ended.
+ *
+ * # Safety
+ * `out_data` and `out_len` must be valid pointers.
+ */
+int32_t probe_stream_next(uint64_t timeout_ms, uint8_t **out_data, uintptr_t *out_len);
+
+/**
+ * Stops the live stream, if any. `probe_stream_next` then returns -1.
+ */
+void probe_stream_stop(void);
+
+/**
+ * Asks the device for a keyframe (RTCP PLI + FIR), sent with the next packet received.
+ * The decoder needs one after it resets, since later frames only carry changes.
+ */
+void probe_stream_keyframe(void);
+
+/**
  * Automatically creates and connects to Core Device Proxy, returning a client handle
  *
  * # Arguments

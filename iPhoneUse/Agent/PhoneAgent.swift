@@ -215,6 +215,7 @@ final class PhoneAgent: ObservableObject {
             let device = DeviceSession.shared
             for line in script.split(separator: ";").map({ $0.split(separator: " ").map(String.init) }) where !line.isEmpty {
                 let n = line.dropFirst().compactMap { Double($0) }.map { CGFloat($0) }
+                let t0 = Date()
                 do {
                     switch line[0] {
                     case "open": try device.agentLaunch(bundleID: line[1])
@@ -225,11 +226,13 @@ final class PhoneAgent: ObservableObject {
                     case "home": try device.agentHome()
                     case "wait": try? await Task.sleep(for: .seconds(n[0]))
                     case "shot":
-                        try device.agentScreenshot(jpeg: false)
-                            .write(to: URL.documentsDirectory.appending(path: "\(line[1]).png"))
+                        let image = try device.agentScreenshot()
+                        try image.write(to: URL.documentsDirectory.appending(path: "\(line[1]).\(image.first == 0xFF ? "jpg" : "png")"))
+                    case "live": try LiveScreen.shared.start(device)
+                    case "unlive": await self?.say(LiveScreen.shared.stop())
                     default: break
                     }
-                    await self?.say("ok: \(line.joined(separator: " "))")
+                    await self?.say(String(format: "ok: %@ (%.0f ms)", line.joined(separator: " "), Date().timeIntervalSince(t0) * 1000))
                 } catch {
                     await self?.say("failed: \(line.joined(separator: " ")): \(error.localizedDescription)")
                 }
@@ -327,6 +330,12 @@ final class PhoneAgent: ObservableObject {
             return "error: no tunnel: \(error.localizedDescription)"
         }
         var messages = Decide.firstMessages(task: prompt, config: config)
+        do {
+            try LiveScreen.shared.start(device)
+        } catch {
+            await say("no live screen, using screenshots: \(error.localizedDescription)")
+        }
+        defer { LiveScreen.shared.stop() }
 
         for step in 1...config.maxSteps {
             if Task.isCancelled { return "stopped" }
@@ -334,7 +343,7 @@ final class PhoneAgent: ObservableObject {
             let t0 = Date()
             let raw: Data
             do {
-                raw = try device.agentScreenshot(jpeg: false)
+                raw = try device.agentScreenshot()
             } catch {
                 return "error: screenshot failed: \(error.localizedDescription)"
             }
